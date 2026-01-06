@@ -1,0 +1,5984 @@
+URL: https://github.com/raspberrypi/rpi-sb-provisioner/tree/main/docs
+
+Automated provisioning of secure boot and encryption for Raspberry Pi
+devices
+
+Note
+
+What is "provisioning"?
+
+Provisioning means preparing a device for use. Think of it like setting
+up a new mobile phone:
+
+- Installing the operating system
+
+- Configuring security settings
+
+- Making sure everything is ready to work
+
+This tool does all of that automatically for Raspberry Pi devices.
+
+What Problem Does This Solve?
+
+Imagine you need to prepare 100 Raspberry Pi devices for your business.
+
+Each device needs:
+
+- A secure boot system (so only your software can run on it)
+
+- Encrypted storage (so your data is protected)
+
+- Your custom operating system installed
+
+- Security keys programmed correctly
+
+Without this tool, preparing each device manually is time-consuming and
+error-prone. Each command must be executed precisely. A single mistake
+requires restarting the entire process.
+
+This tool automates the entire provisioning workflow. Connect a device,
+and the tool handles all configuration steps automatically. Typical
+provisioning time is approximately 3 minutes per device (for a 2.6GB OS
+image).
+
+Who Should Use This Tool?
+
+This tool is designed for:
+
+- Businesses building products with Raspberry Pi devices
+
+- Manufacturers producing devices at scale
+
+- System integrators deploying secure systems
+
+- Anyone who needs to prepare multiple Raspberry Pi devices with
+  security features
+
+This tool does not require security expertise to operate. Knowledge of
+encryption algorithms or boot chain implementation is not necessary. The
+tool handles cryptographic operations and security configuration
+automatically.
+
+What You Get
+
+When you use this tool, each device you prepare will have:
+
+1. Secure Boot Protection
+
+Your device will only execute software that has been cryptographically
+signed with your private key. This prevents unauthorized software from
+running on the device. The secure boot chain verifies each component
+before execution, from bootloader through to operating system.
+
+2. Encrypted Storage
+
+All data on the device storage is encrypted using full-disk encryption.
+If the storage media is removed or stolen, the data remains protected.
+Each device uses a unique encryption key tied to the device hardware,
+preventing storage from being read on other systems.
+
+3. Your Operating System
+
+The tool automatically deploys your custom Raspberry Pi operating system
+to each device. You create a single master image, and the tool
+replicates it to all provisioned devices with appropriate security
+modifications.
+
+4. Manufacturing Records
+
+The tool can maintain a manufacturing database recording details about
+each provisioned device. This includes serial numbers, MAC addresses,
+provisioning timestamps, and security configuration. This data supports
+inventory tracking, warranty management, and customer support
+operations.
+
+5. Consistent Configuration
+
+Every device receives identical configuration, eliminating human error
+and configuration drift. This ensures consistent behavior across your
+device fleet and simplifies technical support operations.
+
+Three Levels of Security
+
+This tool offers three modes of operation. Choose the one that fits your
+needs:
+
++-------------+-----------------------------------+-----------------------+
+| Mode        | What It Does                      | When To Use It        |
++=============+===================================+=======================+
+| secure-boot | Full security: secure boot +      | Production devices    |
+|             | encrypted storage + device-unique | that need maximum     |
+|             | keys                              | security              |
++-------------+-----------------------------------+-----------------------+
+| fde-only    | Encrypted storage + device-unique | When you need         |
+|             | keys (no secure boot)             | encryption but not    |
+|             |                                   | secure boot           |
+|             |                                   | restrictions          |
++=============+===================================+=======================+
+| naked       | Just installs your operating      | Development devices   |
+|             | system (no encryption, no secure  | or when security is   |
+|             | boot)                             | not required          |
++=============+===================================+=======================+
+
+NOTE: This tool is under active development. Please report issues at
+https://github.com/raspberrypi/rpi-sb-provisioner
+
+Supported Devices
+
+This tool can prepare these Raspberry Pi devices:
+
+- Raspberry Pi 5
+
+- Raspberry Pi 4
+
+- Raspberry Pi Compute Module 5
+
+- Raspberry Pi Compute Module 4
+
+- Raspberry Pi Zero 2 W
+
+For specific connection instructions for each device type, see the
+Device Connection Guide below.
+
+What You Need
+
+The Provisioning Computer
+
+This is the computer that runs the provisioning tool. You need:
+
+- One Raspberry Pi 5 (or another 64-bit Raspberry Pi device)
+
+- Power supply: Official Raspberry Pi 27W USB C power supply
+
+- Operating system: Raspberry Pi OS Bookworm or newer
+
+- Storage: At least 32GB free space (for temporary files)
+
+This computer stays on your desk. You connect devices to it for
+provisioning.
+
+Cables and Accessories
+
+What cables you need depends on which devices you want to prepare:
+
++---------------------------+------------------------------------------+
+| Device You Want To        | What You Need                            |
+| Prepare                   |                                          |
++===========================+==========================================+
+| Raspberry Pi 5            | USB A to USB C cable                     |
++---------------------------+------------------------------------------+
+| Raspberry Pi 4            | USB A to USB C cable                     |
++---------------------------+------------------------------------------+
+| Raspberry Pi Compute      | • USB A to microUSB B cable              |
+| Module 4                  | • Compute Module 4 IO Board              |
+|                           | • One jumper wire                        |
++---------------------------+------------------------------------------+
+| Raspberry Pi Compute      | • USB A to USB C cable                   |
+| Module 5                  | • Compute Module 5 IO Board              |
+|                           | • One jumper wire                        |
++===========================+==========================================+
+| Raspberry Pi Zero 2 W     | • USB A to microUSB B cable              |
++===========================+==========================================+
+
+Connecting the Hardware
+
+For Compute Module 4 or 5 devices:
+
+Connect your provisioning Raspberry Pi to the Compute Module IO Board as
+shown in this image:
+
+[A correctly connected provisioning system]
+
+Important
+
+Do not connect other USB devices to the Compute Module IO board during
+provisioning. The provisioning Raspberry Pi can only supply 900mA of
+power to the connected device.
+
+For other device types, see the Device Connection Guide below.
+
+Getting Started
+
+Step 1: Install the Software
+
+First, update your provisioning Raspberry Pi to the latest software:
+
+    sudo apt update && sudo apt full-upgrade -y
+
+Then install this tool:
+
+    sudo apt install -y rpi-sb-provisioner
+
+Step 2: Open the Web Interface
+
+This tool has a simple web interface for configuration. Open it in your
+browser:
+
+    xdg-open http://localhost:3142
+
+You will see a web page with several tabs. You need to configure two
+things: Images and Options.
+
+Step 3: Upload Your Operating System Image
+
+Click the Images tab.
+
+You need a "master" operating system image. This is the operating system
+that will be installed on all your devices.
+
+- The image must be created with pi-gen (the standard Raspberry Pi OS
+  image builder)
+
+- For information about pi-gen, see https://github.com/RPi-Distro/pi-gen
+
+- The image must be uncompressed (not a .zip or .gz file)
+
+Upload your image file using the web interface.
+
+Step 4: Configure Options
+
+Click the Options tab.
+
+You need to set these basic options:
+
+- Security mode: Choose secure-boot, fde-only, or naked (see Three
+  Levels of Security above)
+
+- Device family: Which Raspberry Pi devices are you preparing? (4, 5,
+  2W)
+
+- Storage type: Are your devices using SD cards, eMMC, or NVMe? Choose
+  one: sd, emmc, or nvme
+
+- Signing key: For secure boot mode, you need a signing key (the web
+  interface will guide you through creating one)
+
+The web interface includes help text for each option. Read it carefully.
+
+For complete details about all configuration options, see the
+Configuration Reference.
+
+Step 5: Start Provisioning
+
+Configuration is now complete.
+
+The system is ready to provision devices. See the next section for
+connection instructions.
+
+How To Prepare Devices
+
+Overview
+
+Once configured, the provisioning process is:
+
+1.  Connect the device to your provisioning computer
+
+2.  Monitor progress (all operations are automatic)
+
+3.  Disconnect the device when both LEDs turn off
+
+4.  The device is ready for deployment
+
+Typical provisioning time is approximately 3 minutes per device (for a
+2.6GB OS image). Progress can be monitored through the web interface.
+
+Connecting Your Device
+
+The way you connect devices depends on the device type.
+
+For Compute Module 4 or Compute Module 5
+
+1.  Place the Compute Module into the IO Board
+
+2.  Use the jumper wire to connect the two disable eMMC Boot pins (see
+    image below)
+
+3.  Connect the IO Board to your provisioning computer with the USB
+    cable
+
+4.  The provisioning process starts automatically
+
+[Use a jumper wire to connect the ’disable eMMC Boot’ pins]
+
+For Raspberry Pi 5
+
+Raspberry Pi 5 requires a special button-press procedure:
+
+1.  Hold down the power button on the Raspberry Pi 5
+
+2.  While holding the button, plug in the USB C cable to your
+    provisioning computer
+
+3.  Keep holding the button until the device is recognized
+
+4.  The provisioning process starts automatically
+
+For detailed instructions, see: Raspberry Pi 5 Connection Guide
+
+For Raspberry Pi 4
+
+See the detailed guide: Raspberry Pi 4 Connection Guide
+
+For Raspberry Pi Zero 2 W
+
+See the detailed guide: Raspberry Pi Zero 2 W Connection Guide
+
+What Happens During Provisioning
+
+The tool works in three automatic phases:
+
+Phase 1: Bootstrap
+
+- Device connection is recognized
+
+- For secure boot mode: Signing key hash is programmed into device OTP
+  memory (permanent operation)
+
+- Device firmware is updated to the specified version
+
+- Temporary Linux environment is loaded onto the device
+
+Phase 2: Triage
+
+- Selected security mode is determined from configuration
+
+- Appropriate provisioning service is started
+
+Phase 3: Provisioning
+
+Operations performed depend on the selected security mode:
+
+- secure-boot mode:
+
+  - Creates a unique encryption key for this device
+
+  - Formats the storage device
+
+  - Creates an encrypted container
+
+  - Installs your operating system into the encrypted container
+
+  - Installs signed boot firmware
+
+- fde-only mode:
+
+  - Creates a unique encryption key for this device
+
+  - Formats the storage device
+
+  - Creates an encrypted container
+
+  - Installs your operating system into the encrypted container
+
+  - Installs boot firmware (not signed)
+
+- naked mode:
+
+  - Formats the storage device
+
+  - Installs your operating system directly
+
+When Is The Device Ready?
+
+Provisioning is complete when both the power LED and activity LED are
+off.
+
+If an Ethernet cable is connected, network activity may still be
+visible. This is expected behavior.
+
+When both LEDs are off, you may:
+
+- Disconnect the device from power
+
+- Remove the device
+
+- Deploy the device in your product
+
+No further provisioning steps are required.
+
+Monitoring Progress
+
+You can watch devices being provisioned in real time:
+
+Using the Web Interface:
+
+1.  Open http://localhost:3142 in your browser
+
+2.  Click the Devices tab to see a live visual representation of
+    provisioning progress for all connected devices
+
+3.  Alternatively, click the Services tab to see all active provisioning
+    operations
+
+4.  Click on any device to see detailed logs
+
+Using the Command Line:
+
+To see all active operations: ---- systemctl list-units
+rpi-sb-provisioner* ----
+
+To see detailed logs for a specific device: ---- tail -f
+/var/log/rpi-sb-provisioner/<serial>/provisioner.log ----
+
+Replace <serial> with your device serial number.
+
+Important Security Note
+
+Warning
+
+By default, this tool does not block JTAG debugging access. JTAG is a
+hardware debugging interface.
+
+If you want to block JTAG access for maximum security, you must enable
+the RPI_DEVICE_LOCK_JTAG option in your configuration.
+
+See the Configuration Reference for details.
+
+Note: If you block JTAG, Raspberry Pi engineers cannot help debug
+hardware issues if you need support.
+
+Troubleshooting
+
+When Things Go Wrong
+
+If a device fails to provision correctly, follow these steps:
+
+Step 1: Check The Logs
+
+Easiest method - Web Interface:
+
+1.  Open http://localhost:3142 in your browser
+
+2.  Click the Services tab
+
+3.  Find your device in the list
+
+4.  Click on it to see detailed logs
+
+5.  Look for error messages (they usually explain the problem)
+
+Alternative - Command line:
+
+Replace <serial> with your device serial number:
+
+    tail -f /var/log/rpi-sb-provisioner/<serial>/provisioner.log
+
+For more detailed logs:
+
+    journalctl -xeu rpi-sb-provisioner@<serial> -f
+
+Step 2: Clear The Cache
+
+Sometimes old files cause problems. Clear the cache:
+
+Web Interface:
+
+1.  Go to the Images page
+
+2.  Click Clear caches
+
+Command line:
+
+    sudo rm -rf /var/lock/rpi-sb-provisioner/<serial>
+
+Replace <serial> with your device serial number.
+
+Step 3: Try Again
+
+Disconnect the device, then connect it again to restart provisioning.
+
+Common Problems
+
+Problem: Device Not Detected
+
+Symptoms: You connect the device, but nothing happens.
+
+Solutions:
+
+- Check your USB cable (try a different cable)
+
+- Check you are using the correct connection method for your device type
+
+- For Raspberry Pi 5: Make sure you held the power button before
+  connecting the cable
+
+- For Compute Modules: Check the jumper wire is connecting the correct
+  pins
+
+- Try a different USB port on your provisioning computer
+
+Problem: Provisioning Stops or Hangs
+
+Symptoms: The device starts provisioning but never finishes.
+
+Solutions:
+
+- Check the logs (see Step 1 above)
+
+- Clear the cache (see Step 2 above)
+
+- Check you have enough free disk space (need at least 32GB)
+
+- Try again with a different device to see if the problem is
+  device-specific
+
+Problem: "Already Signed" Error
+
+Symptoms: Error message says the device is already signed or secured.
+
+Explanation: This device was already programmed with a signing key. This
+is permanent.
+
+Solutions:
+
+- If you want to use the same signing key: Tell the tool to skip the
+  signing step:
+
+      sudo touch /etc/rpi-sb-provisioner/special-skip-eeprom/<serial>
+
+- If you want to completely re-provision the device with the same key:
+
+      sudo touch /etc/rpi-sb-provisioner/special-reprovision-device/<serial>
+
+Replace <serial> with your device serial number.
+
+Problem: Need To Test Without Full Provisioning
+
+Symptoms: You want devices to enter fastboot mode but not complete full
+provisioning.
+
+Solution:
+
+Temporarily disable the provisioning step (until next reboot):
+
+    sudo systemctl mask --runtime rpi-sb-triage@.service
+
+Now devices will be bootstrapped into fastboot mode only.
+
+To re-enable full provisioning, reboot your provisioning computer.
+
+Working With The Manufacturing Database
+
+If you enabled the manufacturing database, you can track all the devices
+you have prepared.
+
+The database stores information about each device:
+
+- Serial number
+
+- Board type and revision
+
+- MAC address (Ethernet)
+
+- Provisioning date and time
+
+- Which OS image was installed
+
+- Security settings
+
+Viewing The Database
+
+Web Interface (Easiest):
+
+1.  Open http://localhost:3142
+
+2.  Go to the Manufacturing Database section
+
+3.  You can see all devices and their information
+
+4.  Click Export as CSV to download a spreadsheet file
+
+Command Line:
+
+To export all data to a CSV file:
+
+    sqlite3 ${RPI_SB_PROVISIONER_MANUFACTURING_DB} -cmd ".headers on" -cmd ".mode csv" -cmd ".output devices.csv" "SELECT * FROM rpi_sb_provisioner;"
+
+Finding Secured Devices
+
+To get a list of only devices that have secure boot enabled:
+
+    sqlite3 ${RPI_SB_PROVISIONER_MANUFACTURING_DB} -cmd ".headers on" -cmd ".mode csv" -cmd ".output secured_devices.csv" "SELECT serial FROM rpi_sb_provisioner WHERE secure = 1;"
+
+These devices will only run software signed with your signing key.
+
+Advanced: Customizing Device Configuration
+
+Changing Boot Configuration
+
+If you need to customize the Raspberry Pi boot configuration
+(config.txt):
+
+1.  Edit the config.txt file in your master OS image
+
+2.  Re-upload the image through the web interface
+
+3.  New devices will use your custom configuration
+
+The tool automatically includes your config.txt settings during
+provisioning.
+
+Checking For Special Device Flags
+
+If you have set special flags for specific devices (like skip-eeprom or
+reprovision), you can find them:
+
+    find /etc/rpi-sb-provisioner -name <serial>
+
+Replace <serial> with your device serial number.
+
+Advanced Topics
+
+HTTP API for Integration
+
+The provisioning system provides a comprehensive HTTP API for
+integration with other systems and automation workflows.
+
+The API supports:
+
+- Device monitoring: Real-time status of connected devices during
+  provisioning
+
+- Manufacturing database access: Query and export provisioned device
+  records
+
+- Service monitoring: View provisioning service status and logs
+
+- Configuration management: Programmatic configuration updates
+
+- Image management: Upload, verify, and manage OS images
+
+- Customisation scripts: Create and manage provisioning hooks
+
+- WebSocket support: Real-time updates for devices and long-running
+  operations
+
+- Audit logging: Security and compliance tracking
+
+API Documentation: See Complete API Reference
+
+The API documentation includes:
+
+- Detailed endpoint descriptions with request/response examples
+
+- Authentication and security requirements
+
+- WebSocket protocol specifications
+
+- Error handling and status codes
+
+- Integration examples and use cases
+
+Common integration scenarios:
+
+- Building custom monitoring dashboards
+
+- Automating device provisioning workflows
+
+- Integration with manufacturing execution systems (MES)
+
+- Quality assurance and compliance reporting
+
+- Custom mobile or desktop applications
+
+The web interface at http://localhost:3142 is built using this API,
+demonstrating practical usage patterns.
+
+Scaling to Mass Production
+
+For organizations planning to provision large quantities of devices,
+comprehensive scaling guidance is available.
+
+The scaling guide covers:
+
+- Performance planning: Expected throughput and capacity calculations
+
+- Infrastructure requirements: Hardware, network, and workspace
+  configuration
+
+- Workflow optimization: Pipelined vs. batch provisioning strategies
+
+- Operator efficiency: Optimal device-to-operator ratios
+
+- Deployment sizing: Small, medium, and large-scale operation planning
+
+Scaling Guide: See Mass Provisioning Scaling Guide
+
+The guide includes tested performance data:
+
+- Provisioning time: ~2.5 minutes per device (2.6GB image)
+
+- Operator capacity: Up to 7 devices per operator (pipelined)
+
+- Throughput: ~150 devices per 8-hour shift (single operator, optimized)
+
+Key considerations for production deployment:
+
+- Use pipelined provisioning for maximum efficiency
+
+- Plan for device preparation time (unboxing, cable connection)
+
+- Invest in quality USB infrastructure (official Raspberry Pi powered
+  USB hubs)
+
+- Use NVMe storage on provisioning server for best performance
+
+- Implement quality controls and audit procedures
+
+- Consider API integration with manufacturing execution systems
+
+Getting Help
+
+Something Not Working?
+
+1.  Check the troubleshooting section above - it covers the most common
+    problems
+
+2.  Check the logs - they usually tell you what went wrong
+
+3.  Review your configuration - make sure all settings are correct
+
+Need More Information?
+
+This README provides the essential information to get started. For more
+detailed information:
+
+- System architecture: See Architecture Documentation (understand how
+  the system works)
+
+- Configuration options: See Configuration Reference
+
+- Device-specific guides: See the docs/device-guidance/ folder
+
+- HTTP API documentation: See API Documentation (for integration and
+  automation)
+
+- Mass production scaling: See Scaling Guide (for high-volume
+  operations)
+
+Report Problems
+
+This tool is under active development. If you find a problem:
+
+- Report issues at: https://github.com/raspberrypi/rpi-sb-provisioner
+
+- Include your device type, error messages, and log files
+
+Summary
+
+This tool makes it simple to prepare secure Raspberry Pi devices at
+scale.
+
+What you learned:
+
+- Why you need this tool (automated, secure device provisioning)
+
+- What you get (secure boot, encryption, consistent configuration)
+
+- How to set it up (install, configure, provision)
+
+- How to solve common problems (troubleshooting)
+
+Remember the key points:
+
+- Configuration is done once through the web interface
+
+- Provisioning is automatic - just connect devices
+
+- The web interface shows progress and logs
+
+- Both LEDs off means the device is ready
+
+This documentation provides all necessary information to begin
+provisioning secure Raspberry Pi devices for production deployment.
+
+Quick Reference Card
+
++-----------------------+------------------------------------------------------+
+| Task                  | What To Do                                           |
++=======================+======================================================+
+| Install tool          | sudo apt install rpi-sb-provisioner                  |
++-----------------------+------------------------------------------------------+
+| Configure             | Open http://localhost:3142 → Images tab + Options    |
+|                       | tab                                                  |
++-----------------------+------------------------------------------------------+
+| Monitor devices       | Open http://localhost:3142 → Services tab            |
++-----------------------+------------------------------------------------------+
+| View logs             | Web interface → Services → Click device OR           |
+|                       | tail -f                                              |
+|                       | /var/log/rpi-sb-provisioner/<serial>/provisioner.log |
++-----------------------+------------------------------------------------------+
+| Export database       | Web interface → Manufacturing Database → Export CSV  |
++-----------------------+------------------------------------------------------+
+| Clear cache           | Web interface → Images → Clear caches                |
++-----------------------+------------------------------------------------------+
+| Device ready?         | Both LEDs off = Ready                                |
++-----------------------+------------------------------------------------------+
+| Get help              | Check Troubleshooting section above                  |
++-----------------------+------------------------------------------------------+
+| API access            | See API Documentation for HTTP API                   |
++=======================+======================================================+
+| System architecture   | See Architecture to understand how it works          |
++=======================+======================================================+
+
+Connection Quick Reference
+
++-----------------+-----------------------------------------------------+
+| Device Type     | Connection Method                                   |
++=================+=====================================================+
+| Compute Module  | Jumper wire on disable eMMC Boot pins → Connect USB |
+| 4/5             |                                                     |
++-----------------+-----------------------------------------------------+
+| Raspberry Pi 5  | Hold power button → Connect USB → Release           |
+|                 | Then: Wait for status → Reconnect same way          |
++-----------------+-----------------------------------------------------+
+| Raspberry Pi 4  | One-time: Configure GPIO 8 with recovery.bin        |
+|                 | Each time: Connect GPIO 8 to GND → Connect USB      |
++=================+=====================================================+
+| Raspberry Pi    | Insert empty SD card → Connect USB to "USB" port    |
+| Zero 2 W        | Note: No secure-boot support (use fde-only or       |
+|                 | naked)                                              |
++=================+=====================================================+
+
+For detailed instructions, see the device-specific guides in the Device
+Connection Guide section.
+How to prepare Raspberry Pi 5 devices for provisioning
+
+Overview
+
+Raspberry Pi 5 has a built-in power button. Unlike Raspberry Pi 4, no
+GPIO configuration is required.
+
+The connection process requires holding the power button at specific
+times during the procedure.
+
+What You Need
+
+- One USB A to USB C cable (high quality)
+
+- Your Raspberry Pi 5 device
+
+The Connection Process
+
+Raspberry Pi 5 requires a two-step connection process:
+
+Step 1: Initial Connection
+
+1.  Hold down the power button on the Raspberry Pi 5
+
+2.  While holding the button, plug the USB C cable from your
+    provisioning computer into the Raspberry Pi 5
+
+3.  Keep holding the power button until the provisioning system
+    recognizes the device
+
+    You will see this in the web interface or system logs.
+
+4.  Release the button
+
+The device will start the bootstrap phase.
+
+Step 2: Re-Connection
+
+After a few moments, you need to reconnect the device:
+
+1.  Watch the status in the web interface (http://localhost:3142)
+
+    Wait until you see the status:
+    bootstrap-fastboot-initialisation-started
+
+2.  Unplug the USB C cable from the Raspberry Pi 5
+
+3.  Hold down the power button on the Raspberry Pi 5
+
+4.  While holding the button, plug the USB C cable back into the
+    Raspberry Pi 5
+
+5.  Keep holding the power button until the device is recognized again
+
+6.  Release the button
+
+The device will now continue through the provisioning phases
+automatically.
+
+When Is Provisioning Complete?
+
+Watch the LEDs on the Raspberry Pi 5:
+
+- Both LEDs off = Provisioning is complete
+
+- You can now disconnect the device
+
+- The device is ready to use
+
+Important Points To Remember
+
++-----------------------+-----------------------------------------------+
+| Point                 | Explanation                                   |
++=======================+===============================================+
+| Two connections       | You must connect, disconnect, and reconnect   |
+| required              | the device during provisioning.               |
++-----------------------+-----------------------------------------------+
+| Hold button before    | Always hold the power button BEFORE plugging  |
+| cable                 | in the cable.                                 |
++-----------------------+-----------------------------------------------+
+| Watch for             | Wait for                                      |
+| reconnection status   | bootstrap-fastboot-initialisation-started     |
+|                       | before unplugging.                            |
++-----------------------+-----------------------------------------------+
+| Good cables matter    | Use a high-quality USB A to USB C cable. Poor |
+|                       | cables cause connection problems.             |
++=======================+===============================================+
+| Monitor in web        | The web interface at http://localhost:3142    |
+| interface             | shows you when to reconnect.                  |
++=======================+===============================================+
+
+Troubleshooting Raspberry Pi 5
+
+Problem: Device Not Entering RPIBOOT Mode
+
+Symptoms: You hold the power button and connect the cable, but nothing
+happens.
+
+Solutions:
+
+- Hold button first: Make sure you hold the power button BEFORE
+  connecting the USB cable
+
+- Try a better cable: Use a shorter, high-quality USB A to USB C cable
+
+- Try a different USB port: Some USB ports work better than others
+
+- Check power: Make sure your provisioning computer has enough power
+
+- Keep holding: Hold the button until you see the device is recognized
+
+Problem: Device Not Responding After Re-Connection
+
+Symptoms: After the re-connection step, the device does not continue
+provisioning.
+
+Solutions:
+
+- Check the status first: Make sure you saw
+  bootstrap-fastboot-initialisation-started before unplugging
+
+- Hold button during reconnect: You must hold the power button during
+  the re-connection too
+
+- Check the logs: Look at the web interface or logs for error messages
+
+- Start over: Try the complete process again from Step 1
+
+Problem: Not Sure When To Reconnect
+
+Symptoms: You are not sure when to unplug and reconnect the device.
+
+Solution:
+
+- Use the web interface: Open http://localhost:3142 and go to the
+  Services tab
+
+- Watch for the status: Wait until you see
+  bootstrap-fastboot-initialisation-started
+
+- Then reconnect: When you see this status, follow the reconnection
+  steps
+
+Summary
+
+Connection process:
+
+1.  Hold power button → Plug in cable → Release button
+
+2.  Wait for bootstrap-fastboot-initialisation-started status
+
+3.  Unplug cable
+
+4.  Hold power button → Plug in cable → Release button
+
+5.  Wait for both LEDs to turn off
+
+6.  Provisioning complete
+
+Remember:
+
+- Always hold button before connecting cable
+
+- Watch web interface for reconnection timing
+
+- Use good quality cables
+
+- Both LEDs off = provisioning complete
+How to prepare Raspberry Pi 4 devices for provisioning
+
+Overview
+
+Raspberry Pi 4 differs from Raspberry Pi 5 in its boot mode entry
+method:
+
+- Raspberry Pi 5 has a built-in power button
+
+- Raspberry Pi 4 requires GPIO configuration
+
+Each Raspberry Pi 4 device requires one-time GPIO configuration before
+it can be provisioned.
+
+This configuration is permanent and stored in the device EEPROM.
+
+Step-by-Step Guide
+
+Part 1: One-time GPIO configuration
+
+Before provisioning, configure the device to use GPIO pin 8 for RPIBOOT
+mode.
+
+Requirements:
+
+- Raspberry Pi 4 device
+
+- SD card with Raspberry Pi OS
+
+- recovery.bin tool
+
+Procedure:
+
+1.  Follow the official instructions at:
+    https://github.com/raspberrypi/usbboot/tree/master/secure-boot-recovery#step-2---select-the-nrpiboot-gpio
+
+2.  Use the recovery.bin tool to configure GPIO 8 as the RPIBOOT pin
+
+3.  Verify the configuration (see verification procedure below)
+
+This configuration persists permanently in the device EEPROM and does
+not need to be repeated.
+
+Recommended GPIO Pin: GPIO 8
+
+Part 2: Verifying GPIO Configuration
+
+After GPIO configuration, verify the settings were applied correctly.
+
+Verification procedure:
+
+1.  Boot the Raspberry Pi 4 normally with an SD card containing
+    Raspberry Pi OS
+
+2.  Open a terminal and execute:
+
+        sudo rpi-eeprom-config
+
+3.  Verify the output contains:
+
+        WAKE_ON_GPIO=1
+        GPIO_EXPANDER_CFG=0x00000008
+
+If these lines are present, the configuration is correct and the device
+is ready for provisioning.
+
+If these lines are not present, repeat the recovery.bin configuration
+procedure.
+
+Part 3: Provisioning Connection Procedure
+
+After GPIO 8 configuration is complete, the device can be provisioned.
+
+Required materials:
+
+- One jumper wire
+
+- One USB A to USB C cable
+
+Connection procedure:
+
+1.  Connect GPIO 8 to GND (ground) on the Raspberry Pi 4 using the
+    jumper wire
+
+    This activates RPIBOOT mode.
+
+2.  While maintaining the GPIO 8 to GND connection, connect the USB
+    cable from your provisioning computer to the Raspberry Pi 4
+
+3.  Maintain the jumper wire connection throughout the entire
+    provisioning process
+
+4.  Provisioning will begin automatically
+
+Note: Unlike Raspberry Pi 5, no disconnection and reconnection is
+required. The device will complete all provisioning phases while the
+jumper remains in place.
+
+Determining Completion
+
+Monitor the device LEDs during provisioning:
+
+- Both LEDs off = Provisioning is complete
+
+- The jumper wire can now be removed
+
+- The USB cable can be disconnected
+
+- The device is ready for deployment
+
+Important Points To Remember
+
++-----------------------+-----------------------------------------------+
+| Point                 | Explanation                                   |
++=======================+===============================================+
+| One-time setup        | The GPIO configuration only needs to be done  |
+|                       | once per device. It is permanent.             |
++-----------------------+-----------------------------------------------+
+| GPIO 8 recommended    | Use GPIO 8 for consistency. Other GPIO pins   |
+|                       | can work but GPIO 8 is the standard.          |
++-----------------------+-----------------------------------------------+
+| Keep jumper connected | Do not remove the jumper wire during          |
+|                       | provisioning. Leave it connected until both   |
+|                       | LEDs are off.                                 |
++-----------------------+-----------------------------------------------+
+| No re-connection      | Unlike Raspberry Pi 5, you do not need to     |
+| needed                | unplug and re-plug the device during          |
+|                       | provisioning.                                 |
++=======================+===============================================+
+| Good cables matter    | Use a high-quality USB cable. Poor cables     |
+|                       | cause connection problems.                    |
++=======================+===============================================+
+
+Troubleshooting Raspberry Pi 4
+
+Problem: GPIO Configuration Did Not Work
+
+Symptoms: When you run sudo rpi-eeprom-config, you do not see the GPIO
+settings.
+
+Solutions:
+
+- Follow the official recovery.bin instructions carefully:
+  https://github.com/raspberrypi/usbboot/tree/master/secure-boot-recovery#step-2---select-the-nrpiboot-gpio
+
+- Make sure you used the correct recovery.bin file for your device
+
+- Try the configuration process again
+
+- Boot the device and verify again with sudo rpi-eeprom-config
+
+Advanced check:
+
+You can also extract and inspect the full EEPROM:
+
+    sudo rpi-eeprom-config --out /tmp/current-eeprom.bin
+    rpi-eeprom-config /tmp/current-eeprom.bin
+
+Problem: Device Not Entering RPIBOOT Mode
+
+Symptoms: You connect GPIO 8 to ground and plug in the USB cable, but
+nothing happens.
+
+Solutions:
+
+- Check GPIO configuration first: Use the verification steps above to
+  confirm GPIO 8 was configured correctly
+
+- Check the physical connection: Make sure the jumper wire connects GPIO
+  8 to a ground (GND) pin
+
+- Try a different USB cable: Use a shorter, high-quality cable
+
+- Try a different USB port: Some USB ports provide better power
+
+- Check your provisioning computer: Make sure it has enough power
+
+- Try a different GPIO: If GPIO 8 is not working, you can configure a
+  different GPIO pin (but GPIO 8 is recommended)
+
+Problem: Provisioning Stops or Hangs
+
+Symptoms: The device starts provisioning but does not finish.
+
+Solutions:
+
+- Keep the jumper wire connected: Do not remove the GPIO 8 to ground
+  connection during provisioning
+
+- Check the logs: See the main troubleshooting section in the README
+
+- Verify the device was recognized: Check that the provisioning system
+  detected the device
+
+- Try again: Disconnect everything, reconnect the jumper wire securely,
+  and try again
+
+Summary
+
+Before first use:
+
+- Configure GPIO 8 using recovery.bin (once per device, permanent)
+
+- Verify with sudo rpi-eeprom-config
+
+For each provisioning:
+
+- Connect GPIO 8 to GND with jumper wire
+
+- Keep jumper wire connected
+
+- Plug in USB cable
+
+- Wait for both LEDs to turn off
+
+- Remove jumper wire and disconnect
+
+Remember:
+
+- No disconnection/reconnection needed (unlike Pi 5)
+
+- Use good quality USB cables
+
+- Keep jumper wire in place until complete
+How to prepare Raspberry Pi Zero 2 W devices for provisioning
+
+Important Limitation: No Secure Boot
+
+Warning
+
+Secure boot is NOT available on Raspberry Pi Zero 2 W devices.
+
+The Zero 2 W does not have the hardware needed for secure boot. You can
+only use:
+
+- fde-only mode (encryption without secure boot)
+
+- naked mode (no encryption, no secure boot)
+
+Do NOT use secure-boot mode with Zero 2 W. It will not work.
+
+Connection Overview
+
+The Zero 2 W does not have a power button or boot button. Entry into
+RPIBOOT mode is automatically triggered by an empty SD card.
+
+Required Materials
+
+- One USB A to microUSB B cable
+
+- Raspberry Pi Zero 2 W device
+
+- SD card (any size, FAT32 formatted)
+
+Connection Procedure
+
+With the empty SD card:
+
+1.  Insert the empty SD card into the Zero 2 W
+
+2.  Connect the microUSB cable from your provisioning computer to the
+    Zero 2 W
+
+    Connect to the data USB port (marked "USB", not "PWR IN")
+
+3.  The Zero 2 W will automatically enter RPIBOOT mode
+
+4.  Provisioning will begin automatically
+
+No button pressing is required.
+
+Determining Completion
+
+Monitor the device status:
+
+- When provisioning is complete, the activity LED will be off
+
+- The device can be disconnected
+
+- The device is ready for deployment
+
+Troubleshooting Zero 2 W
+
+Problem: Device Not Entering RPIBOOT Mode
+
+Symptoms: You connect the device with an emtpy SD card, but it is not
+recognized by the provisioning system.
+
+Solutions:
+
+1. Check the SD card is prepared correctly
+
+- The SD card must be formatted as FAT32
+
+- The SD card must be completely empty
+
+2. Try a better USB cable
+
+The USB cable quality is very important for Zero 2 W devices.
+
+- Use a shorter cable (under 1 meter is better)
+
+- Use a high-quality cable with good data connections
+
+- Cheap cables often only have power wires, not data wires
+
+3. Make sure you are using the correct USB port
+
+The Zero 2 W has two microUSB ports:
+
+- USB port (marked "USB"): This is the data port - use this one
+
+- Power port (marked "PWR IN"): This is power only - do NOT use this
+
+Connect your cable to the "USB" port, not the "PWR IN" port.
+
+4. Try a different USB port on your provisioning computer
+
+Some USB ports work better than others:
+
+- If you are using a USB 3 port (blue inside), try a USB 2 port (black
+  or white inside)
+
+- Try different ports on your provisioning computer
+
+- Avoid using USB hubs if possible
+
+5. Boot the device first with Raspberry Pi OS
+
+Some Zero 2 W devices need to be booted once with Raspberry Pi OS before
+RPIBOOT mode works correctly.
+
+This is a known issue:
+https://github.com/raspberrypi/usbboot/issues/101#issuecomment-983641043
+
+How to do this:
+
+1.  Get an SD card (different from your empty card)
+
+2.  Install recent Raspberry Pi OS on it (using Raspberry Pi Imager)
+
+3.  Put the SD card in the Zero 2 W
+
+4.  Boot the Zero 2 W normally (let it fully start up)
+
+5.  Shut it down
+
+6.  Remove the OS SD card
+
+7.  Insert your empty SD card
+
+8.  Try the RPIBOOT connection process again
+
+After this, RPIBOOT mode should work normally.
+
+Problem: SD card not working
+
+Symptoms: You have formatted the SD card, but the device still does not
+enter RPIBOOT mode.
+
+Solutions:
+
+- Check the card is truly empty: There shouldn’t be any files or folders
+  on the SD card.
+
+- Try a different SD card: Some SD cards do not work well. Try a
+  different card.
+
+- Reformat the SD card: Use the official SD card formatter tool from the
+  SD Association: https://www.sdcard.org/downloads/formatter/
+
+Problem: Provisioning Fails With Errors
+
+Symptoms: The device connects but provisioning fails with errors.
+
+Solutions:
+
+- Check your security mode: Make sure you are NOT using secure-boot mode
+  (it is not supported)
+
+- Use fde-only or naked: These are the only supported modes for Zero 2 W
+
+- Check the logs: See the main troubleshooting section in the README
+
+Summary
+
+Remember for Zero 2 W:
+
+- NO secure boot support - use fde-only or naked mode only
+
+- Empty SD card required - need an empty FAT32 formatted SD card
+
+- Correct USB port - use the "USB" port, not "PWR IN"
+
+- Cable quality matters - use short, high-quality cables
+
+- USB port matters - try USB 2 ports if USB 3 does not work
+
+- May need first boot - boot with Raspberry Pi OS once if RPIBOOT fails
+
+One-time preparation
+
+1.  No special setup needed
+
+Connection process:
+
+1.  Insert empty SD card into Zero 2 W
+
+2.  Connect microUSB cable to "USB" port (not "PWR IN")
+
+3.  Device automatically enters RPIBOOT mode
+
+4.  Wait for provisioning to complete
+Technical overview of the rpi-sb-provisioner system design
+
+Overview
+
+The rpi-sb-provisioner is designed around a core principle: transparency
+of action. Every operation is explicit, auditable, and uses standard
+Linux tools and interfaces. The system is built from composable
+components that can be understood, inspected, and maintained
+independently.
+
+Design Philosophy
+
+The architecture prioritizes:
+
+- Transparency: All operations are visible through standard Linux tools
+  (systemd, journalctl, filesystem)
+
+- Auditability: Comprehensive logging at every stage; operations can be
+  traced and verified
+
+- Composability: Separate concerns into distinct components that
+  communicate through well-defined interfaces
+
+- Simplicity: Prefer shell scripts and standard tools over complex
+  frameworks
+
+- Security: Minimize attack surface; operations run with minimal
+  necessary privileges
+
+- Maintainability: Code should be readable by system administrators, not
+  just developers
+
+High-Level Architecture
+
+The system consists of five main components:
+
++---------------+-----------------------------------+-----------------------+
+| Component     | Purpose                           | Implementation        |
++===============+===================================+=======================+
+| udev Rules    | Detect device connections and     | udev rule file        |
+|               | trigger provisioning              |                       |
++---------------+-----------------------------------+-----------------------+
+| systemd       | Orchestrate provisioning workflow | systemd template      |
+| Services      | phases                            | units                 |
++---------------+-----------------------------------+-----------------------+
+| Shell Scripts | Execute provisioning operations   | POSIX shell scripts   |
++---------------+-----------------------------------+-----------------------+
+| Web Service   | Provide monitoring and            | C++ (Drogon           |
+|               | configuration interface           | framework)            |
++===============+===================================+=======================+
+| Configuration | Store provisioning parameters and | Filesystem-based      |
+|               | state                             |                       |
++===============+===================================+=======================+
+
+Component Architecture
+
+1. Device Detection (udev)
+
+The provisioning workflow begins with device detection.
+
+udev Rules (/lib/udev/rules.d/60-rpi-sb-provisioner.rules)
+
+Two rules detect Raspberry Pi devices in different boot states:
+
+Rule 1: RPIBOOT mode detection ---- ACTION=="add", SUBSYSTEM=="usb",
+ATTRS{idVendor}=="0a5c", ATTR{idProduct}=="2764|2711|2712",
+TAG+="systemd", PROGRAM="/usr/bin/systemd-escape -p
+--template=rpi-sb-bootstrap@.service $env{DEVNAME}",
+ENV{SYSTEMD_WANTS}+="%c" ----
+
+Triggers when: Raspberry Pi device connects in RPIBOOT mode (bootloader
+USB mode)
+
+Action: Start rpi-sb-bootstrap@.service with the device path as
+parameter
+
+Product IDs: * 2764 - Raspberry Pi 3 family devices (Zero 2 W) * 2711 -
+Raspberry Pi 4 family devices (Raspberry Pi 4, Compute Module 4) *
+2712 - Raspberry Pi 5 family devices (Raspberry Pi 5, Compute Module 5)
+
+Rule 2: fastboot mode detection ---- ACTION=="add", SUBSYSTEM=="usb",
+ATTRS{idVendor}=="18d1", ATTR{idProduct}=="4e40",
+ATTR{manufacturer}=="Raspberry Pi" TAG+="systemd",
+PROGRAM="/usr/bin/systemd-escape -p --template=rpi-sb-triage@.service
+$attr{serial}", ENV{SYSTEMD_WANTS}+="%c" ----
+
+Triggers when: Device has been bootstrapped and enters fastboot mode
+
+Action: Start rpi-sb-triage@.service with the device serial number as
+parameter
+
+Why This Design?
+
+- Automatic triggering: No manual intervention required; plugging in a
+  device starts provisioning
+
+- systemd integration: Leverages systemd’s service management, logging,
+  and monitoring
+
+- Device isolation: Each device gets its own service instance (systemd
+  template units)
+
+- Standard interface: Uses udev, the standard Linux device management
+  system
+
+2. Provisioning Workflow (systemd Services)
+
+Provisioning proceeds through three phases, each implemented as a
+systemd template service.
+
+Phase 1: Bootstrap (rpi-sb-bootstrap@.service)
+
+Purpose: Initialize device, program security keys, update firmware
+
+Triggered by: udev rule detecting RPIBOOT mode
+
+Key operations: * Load recovery firmware into device via rpiboot * For
+secure boot mode: Program signing key hash into device OTP memory *
+Update device EEPROM firmware * Boot device into fastboot mode
+
+Script: /usr/bin/rpi-sb-bootstrap.sh
+
+Logging: /var/log/rpi-sb-provisioner/<serial>/bootstrap.log
+
+State tracking: /var/run/rpi-sb-state/<serial>/bootstrap
+
+Phase 2: Triage (rpi-sb-triage@.service)
+
+Purpose: Determine provisioning mode and start appropriate provisioner
+
+Triggered by: udev rule detecting fastboot mode
+
+Key operations: * Read configuration to determine PROVISIONING_STYLE *
+Verify device is in fastboot mode * Start appropriate provisioning
+service: - secure-boot → rpi-sb-provisioner@.service - fde-only →
+rpi-fde-provisioner@.service - naked → rpi-naked-provisioner@.service
+
+Script: /usr/bin/rpi-sb-triage.sh
+
+Logging: /var/log/rpi-sb-provisioner/<serial>/triage.log
+
+State tracking: /var/run/rpi-sb-state/<serial>/triage
+
+Phase 3: Provisioning (rpi-*-provisioner@.service)
+
+Purpose: Deploy operating system and configure security
+
+Three variants implement different security models:
+
+Secure Boot Provisioner (rpi-sb-provisioner@.service)
+
+- Create device-unique encryption key and store in OTP memory
+
+- Partition and format storage
+
+- Create LUKS2 encrypted container
+
+- Deploy OS image into encrypted container
+
+- Create pre-boot authentication environment (kernel + minimal modules)
+
+- Sign EEPROM bootloader and pre-boot environment with customer key
+
+- Configure secure boot chain
+
+Full Disk Encryption Provisioner (rpi-fde-provisioner@.service)
+
+- Create device-unique encryption key and store in OTP memory
+
+- Partition and format storage
+
+- Create LUKS2 encrypted container
+
+- Deploy OS image into encrypted container
+
+- Create pre-boot authentication environment (unsigned)
+
+Naked Provisioner (rpi-naked-provisioner@.service)
+
+- Partition and format storage
+
+- Deploy OS image directly (no encryption)
+
+- Install standard boot firmware (uses Raspberry Pi retail key)
+
+Scripts: * /usr/bin/rpi-sb-provisioner.sh *
+/usr/bin/rpi-fde-provisioner.sh * /usr/bin/rpi-naked-provisioner.sh
+
+Logging: /var/log/rpi-sb-provisioner/<serial>/provisioner.log
+
+State tracking: /var/run/rpi-sb-state/<serial>/provisioner
+
+Why This Design?
+
+- Phase separation: Each phase has clear responsibilities and can be
+  debugged independently
+
+- Service isolation: systemd ensures proper resource management and
+  cleanup
+
+- Parallel execution: Multiple devices can be provisioned simultaneously
+
+- Standard monitoring: Use systemctl and journalctl for service
+  inspection
+
+- Transparent state: State files allow external monitoring without
+  querying the service
+
+3. Shell Script Implementation
+
+Core provisioning logic is implemented in POSIX shell scripts.
+
+Script Structure
+
+Common functions (rpi-sb-common.sh)
+
+Shared utilities used by all phases:
+
+- Configuration reading (read_config)
+
+- Logging functions
+
+- Device information extraction
+
+- USB path resolution
+
+- Error handling
+
+Phase-specific scripts
+
+Each phase has a dedicated script implementing its operations:
+
+- Entry point receives device identifier from systemd
+
+- Sources common functions
+
+- Implements phase-specific logic
+
+- Updates state files
+
+- Records manufacturing data
+
+- Returns exit code to systemd
+
+Why Shell Scripts?
+
+- Transparency: Operations are explicit command invocations, easy to
+  trace
+
+- Debuggability: Can be run manually for testing and troubleshooting
+
+- Standard tools: Uses openssl, cryptsetup, fastboot, and other standard
+  utilities
+
+- Inspectability: System administrators can read and understand the code
+
+- Portability: POSIX shell is universally available on Linux systems
+
+- Auditability: Every command is visible in logs with set -x
+
+4. Web Service (provisioner-service)
+
+A web service provides monitoring, configuration, and API access.
+
+Implementation
+
+Technology: C++ using Drogon web framework
+
+Purpose: * Web-based configuration interface * Real-time device
+monitoring * Manufacturing database access * REST API for integration *
+WebSocket support for live updates
+
+Architecture
+
+HTTP endpoints:
+
+- /options/* - Configuration management
+
+- /devices/* - Device status and logs
+
+- /api/v2/services - Service monitoring
+
+- /api/v2/manufacturing - Manufacturing database queries
+
+- /customisation/* - Provisioning script management
+
+- /get-images - OS image management
+
+WebSocket endpoints:
+
+- /ws/devices - Real-time device topology updates
+
+- /ws/sha256 - Live hash calculation progress
+
+Views: Server-side templates (CSP files compiled to C++)
+
+Data sources:
+
+- systemd API (D-Bus) - Service status
+
+- Filesystem - Logs, state files, configuration
+
+- SQLite - Manufacturing database, audit log
+
+Why This Design?
+
+- Separation of concerns: Web service only monitors; shell scripts do
+  the work
+
+- No privilege escalation: Web service runs as unprivileged user; uses
+  sudo only for specific read operations
+
+- Standard protocols: HTTP REST API and WebSockets for integration
+
+- Stateless monitoring: Service reads state from filesystem; does not
+  maintain critical state
+
+- Fail-safe: If web service crashes, provisioning continues unaffected
+
+5. Configuration and State Management
+
+Configuration (/etc/rpi-sb-provisioner/config)
+
+Simple key-value file format: ---- PROVISIONING_STYLE=secure-boot
+RPI_DEVICE_FAMILY=5 RPI_DEVICE_STORAGE_TYPE=nvme
+CUSTOMER_KEY_FILE_PEM=/path/to/key.pem
+GOLD_MASTER_OS_FILE=/path/to/image.img ----
+
+Read by: All shell scripts via read_config function
+
+Modified by: Web service or manual editing
+
+Why: Simple, transparent, version-controllable, easy to backup
+
+State Tracking (/var/run/rpi-sb-state/)
+
+Directory structure: ---- /var/run/rpi-sb-state/ <serial>/ bootstrap #
+Bootstrap phase state triage # Triage phase state provisioner #
+Provisioning phase state ----
+
+State files contain: * Phase status (STARTED, FINISHED, ABORTED) *
+Timestamps * USB path information
+
+Purpose: Allow web service and external tools to monitor progress
+without interfacing with systemd
+
+Why tmpfs: State is ephemeral; cleared on reboot; should not persist
+
+Logging (/var/log/rpi-sb-provisioner/)
+
+Directory structure: ---- /var/log/rpi-sb-provisioner/ <serial>/
+bootstrap.log # Bootstrap phase operations triage.log # Triage phase
+operations provisioner.log # Provisioning phase operations keypair/ #
+Device-unique keys (if enabled) <serial>.der # Private key <serial>.pub
+# Public key ----
+
+Log format: Timestamped entries with explicit command output
+
+Retention: Persists across reboots; managed by logrotate
+
+Why: Comprehensive audit trail; troubleshooting; compliance
+
+Locking (/var/lock/rpi-sb-provisioner/)
+
+Per-device lock directories prevent race conditions: ----
+/var/lock/rpi-sb-provisioner/ <serial>/ ----
+
+Acquired by: Each phase before starting operations
+
+Released by: Phase completion or failure cleanup
+
+Why: Prevents duplicate provisioning if device reconnects during process
+
+Manufacturing Database (SQLite)
+
+Optional database recording device information.
+
+Location: Configurable (typically
+/var/lib/rpi-sb-provisioner/manufacturing.db)
+
+Schema: Single table with device attributes: * Serial number * Board
+type and revision * MAC addresses (Ethernet, Wi-Fi, Bluetooth) * Storage
+information * Security configuration * Provisioning timestamp * OS image
+details
+
+Purpose: Track provisioned devices for inventory, warranty, and
+compliance
+
+Provisioned System Architecture
+
+After provisioning is complete, the device has a specific security
+architecture depending on the provisioning mode.
+
+Secure Boot Mode: Complete Architecture
+
+In secure boot mode, the device implements a complete authenticated boot
+chain with encrypted storage.
+
+Storage Layout
+
+[Secure Boot Storage Layout]
+
+Boot partition structure:
+
+Partition 1 contains two special files:
+
+- boot.img: A FAT32 filesystem image file containing all boot components
+  (firmware, kernel, initramfs, pre-boot authentication environment).
+  The EEPROM bootloader mounts this image to access boot files.
+
+- boot.sig: Cryptographic signature for boot.img, signed with customer
+  private key. The EEPROM bootloader verifies this signature before
+  mounting boot.img.
+
+This encapsulation ensures the entire boot environment is authenticated
+as a single unit.
+
+Secure Boot Chain
+
+The boot process implements cryptographic verification at each stage:
+
+[Secure Boot Chain]
+
+Key security properties:
+
+- Authenticated boot chain: Each component cryptographically verifies
+  the next before execution
+
+- Customer key in hardware: Key hash burned into device OTP memory
+  (permanent, cannot be changed)
+
+- Signed components: Only components signed with customer private key
+  will execute
+
+- Encrypted storage: All OS data protected by LUKS2 encryption
+
+- Device-unique keys: Each device has unique encryption key stored in
+  OTP memory
+
+- Automatic unlock: Pre-boot environment retrieves decryption key from
+  OTP memory; no user interaction required
+
+- Minimal pre-boot environment: Contains only kernel and modules
+  necessary for LUKS unlock and pivot_root
+
+Security Guarantees
+
+What this prevents:
+
+- Unauthorized code execution: Device will not execute code not signed
+  with customer key
+
+- Storage extraction: Removing storage and reading it on another system
+  yields only encrypted data
+
+- Key extraction from storage: Decryption key is stored in device OTP
+  memory, not on storage device
+
+- Device cloning: Decryption keys are unique per device and stored in
+  OTP; cannot clone storage to another device
+
+- Boot chain tampering: Any modification to EEPROM bootloader or
+  pre-boot environment will fail signature verification
+
+What this requires:
+
+- Secure key management: Customer private key must be protected (used
+  for signing)
+
+- Trust in device hardware: Security depends on device OTP memory and
+  secure key storage
+
+Full Disk Encryption (FDE) Mode: Architecture
+
+FDE mode provides encrypted storage without secure boot enforcement.
+
+Storage Layout
+
+[FDE Storage Layout]
+
+Boot partition structure:
+
+Partition 1 contains:
+
+- boot.img: A FAT32 filesystem image file containing boot components
+  (pre-boot authentication environment, kernel, initramfs). The EEPROM
+  bootloader mounts this image to access boot files.
+
+- No signature file: Unlike secure boot mode, there is no boot.sig file.
+  The boot.img is loaded without verification.
+
+The storage layout is similar to secure boot mode (boot partition +
+LUKS2 container), but without boot authentication.
+
+Boot Chain
+
+[FDE Boot Chain]
+
+Key differences from secure boot mode:
+
+- Raspberry Pi retail key: EEPROM bootloader authenticated with
+  Raspberry Pi Ltd retail key (not customer key)
+
+- Firmware substitution: Any official Raspberry Pi firmware release can
+  be substituted
+
+- No pre-boot verification: Pre-boot authentication environment loaded
+  WITHOUT signature verification
+
+- Encryption only: Storage is encrypted, but pre-boot environment can be
+  modified
+
+- Same unlock mechanism: Uses OTP-stored decryption key and pivot_root
+
+Use case: Scenarios requiring encryption without full boot chain
+authentication restrictions.
+
+Naked Mode: Architecture
+
+Naked mode provides basic OS deployment without security features.
+
+Boot partition structure:
+
+Partition 1 contains boot files directly (traditional Raspberry Pi
+layout):
+
+- Standard boot firmware files
+
+- Kernel and device tree files
+
+- No encapsulation in boot.img
+
+- No signature files
+
+Storage Layout
+
+[Naked Mode Storage Layout]
+
+Boot Chain
+
+    Device Powers On → Bootloader → Firmware → Kernel → Your OS
+
+Characteristics:
+
+- No encryption: Storage contents readable if device is extracted
+
+- EEPROM authenticated: EEPROM bootloader uses Raspberry Pi retail key
+  authentication
+
+- Kernel not authenticated: No signature verification of kernel or boot
+  files
+
+- Standard boot: Conventional Raspberry Pi boot process
+
+- Fastest provisioning: No encryption operations during deployment
+
+Use case: Development environments, non-security-critical deployments,
+maximum compatibility.
+
+Comparison of Provisioning Modes
+
++----------------+-------------------+-------------------+-------------------+
+| Feature        | Secure Boot       | FDE Only          | Naked             |
++================+===================+===================+===================+
+| EEPROM         | ✓ Customer key    | ✓ RPi retail key  | ✓ RPi retail key  |
+| authentication |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Pre-boot       | ✓ Customer key    | ✗ No              | N/A               |
+| environment    |                   |                   |                   |
+| auth           |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Storage        | ✓ Yes (LUKS2)     | ✓ Yes (LUKS2)     | ✗ No              |
+| encryption     |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Device-unique  | ✓ Yes             | ✓ Yes             | ✗ No              |
+| keys           |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Customer       | ✓ Yes             | ✗ No              | ✗ No              |
+| firmware       |                   |                   |                   |
+| signing        |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| OTP customer   | ✓ Yes (permanent) | ✗ No (RPi retail) | ✗ No (RPi retail) |
+| key            |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| OTP encryption | ✓ Yes             | ✓ Yes             | ✗ No              |
+| key            |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Storage        | ✗ No (encrypted)  | ✗ No (encrypted)  | ✓ Yes             |
+| extractable    |                   |                   | (unencrypted)     |
++----------------+-------------------+-------------------+-------------------+
+| Firmware       | ✗ No              | ✓ Yes (any RPi    | ✓ Yes (any RPi    |
+| substitution   | (customer-signed  | firmware)         | firmware)         |
+|                | only)             |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Pre-boot       | ✗ No (signature   | ✓ Yes (no         | N/A               |
+| environment    | verification)     | verification)     |                   |
+| modifiable     |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Provisioning   | Longest           | Medium            | Fastest           |
+| time           |                   |                   |                   |
++----------------+-------------------+-------------------+-------------------+
+| Security level | Maximum           | Medium            | Minimal           |
++================+===================+===================+===================+
+| Use case       | Production        | Encryption        | Development,      |
+|                | devices           | without boot      | testing           |
+|                |                   | restrictions      |                   |
++================+===================+===================+===================+
+
+Data Flow
+
+Complete Provisioning Sequence
+
+    1. Device connects in RPIBOOT mode
+       ↓
+    2. udev detects connection
+       ↓
+    3. udev starts rpi-sb-bootstrap@<device>.service
+       ↓
+    4. Bootstrap script:
+       - Acquires device lock
+       - Loads device via rpiboot
+       - Programs security keys (if secure-boot)
+       - Updates EEPROM firmware
+       - Boots device into fastboot mode
+       - Updates state: BOOTSTRAP-FINISHED
+       ↓
+    5. Device reconnects in fastboot mode
+       ↓
+    6. udev detects fastboot device
+       ↓
+    7. udev starts rpi-sb-triage@<serial>.service
+       ↓
+    8. Triage script:
+       - Reads configuration
+       - Determines PROVISIONING_STYLE
+       - Starts appropriate provisioner service
+       - Updates state: TRIAGE-FINISHED
+       ↓
+    9. Provisioner service starts
+       ↓
+    10. Provisioner script:
+        - Partitions storage
+        - Creates encryption (if enabled)
+        - Deploys OS image
+        - Configures boot firmware
+        - Records manufacturing data
+        - Updates state: PROVISIONER-FINISHED
+        - Powers down device
+       ↓
+    11. Device LEDs turn off
+       ↓
+    12. Provisioning complete
+
+Monitoring Flow
+
+    Web Browser → HTTP Request → provisioner-service
+                                         ↓
+                                systemd D-Bus API (service status)
+                                /var/run/rpi-sb-state/ (state files)
+                                /var/log/rpi-sb-provisioner/ (logs)
+                                SQLite database (manufacturing data)
+                                         ↓
+                                HTTP Response / WebSocket message
+                                         ↓
+                                Web Browser (display)
+
+Design Rationale
+
+Why Separate Bootstrap and Triage Phases?
+
+Bootstrap phase: Device-specific hardware operations that must happen
+before storage is accessible
+
+Triage phase: Configuration-dependent routing to appropriate provisioner
+
+Benefit: Bootstrap can be tested independently of provisioning; triage
+logic is simple and fast
+
+Why Shell Scripts Instead of Compiled Code?
+
+Transparency: Every operation is a visible command invocation
+
+Debuggability: Can be executed manually with set -x to see exactly what
+happens
+
+Maintainability: System administrators can read and modify scripts
+without recompilation
+
+Auditability: Logs show exact commands executed; no hidden operations
+
+Trust: Users can inspect code to verify no unwanted operations occur
+
+Why systemd Template Units?
+
+Isolation: Each device gets independent service instance
+
+Resource management: systemd handles process lifecycle, logging, and
+cleanup
+
+Monitoring: Standard systemctl and journalctl commands work
+
+Dependency management: Service ordering and dependencies are explicit
+
+Why Filesystem-Based State?
+
+Transparency: State is visible in filesystem; no hidden state
+
+Simplicity: No database or complex state management needed
+
+Integration: External tools can monitor state by reading files
+
+Durability: Logs persist; ephemeral state is in tmpfs
+
+Why Separate Web Service?
+
+Security: Web service runs with minimal privileges; cannot disrupt
+provisioning
+
+Reliability: Provisioning continues if web service fails
+
+Maintainability: Web UI can be updated independently of core
+provisioning logic
+
+API access: Provides programmatic interface for integration without
+modifying core scripts
+
+Security Considerations
+
+Privilege Separation
+
+- Bootstrap/provisioning scripts: Run as root (required for device
+  access and storage operations)
+
+- Web service: Runs as unprivileged user; uses sudo only for specific
+  read operations
+
+- Configuration: Protected by filesystem permissions
+
+- Signing keys: Stored with restricted permissions; never exposed via
+  API
+
+Attack Surface Minimization
+
+- No network services on provisioned devices: All communication via USB
+
+- No persistent state on provisioned devices during provisioning: Device
+  powers down after completion
+
+- Minimal dependencies: Uses standard Linux tools; reduces potential
+  vulnerabilities
+
+- Explicit operations: No hidden functionality; all actions logged
+
+Audit Trail
+
+- Comprehensive logging: Every operation recorded with timestamp
+
+- Manufacturing database: Optional tracking of all provisioned devices
+
+- Audit log: Web service API access tracked with client information
+
+- State files: Phase transitions recorded
+
+Extensibility
+
+Adding New Provisioning Modes
+
+1.  Create new shell script (e.g., rpi-custom-provisioner.sh)
+
+2.  Add systemd service file (e.g., rpi-custom-provisioner@.service)
+
+3.  Modify triage script to recognize new PROVISIONING_STYLE value
+
+4.  Script implements provisioning logic using common functions
+
+Custom Provisioning Hooks
+
+Customisation scripts can be installed at various hook points:
+
+- bootstrap-begin - Before bootstrap operations
+
+- bootstrap-end - After bootstrap completion
+
+- mount-os - After OS filesystem is mounted, before unmount
+
+- post-flash - After image flashing, before device power-down
+
+Hooks receive environment variables with device information and can
+modify mounted filesystems.
+
+API Integration
+
+HTTP API allows external systems to:
+
+- Query manufacturing database
+
+- Monitor device provisioning status
+
+- Access provisioning logs
+
+- Configure provisioning parameters
+
+WebSocket API provides real-time updates for dashboards and monitoring
+tools.
+
+Deployment Considerations
+
+System Requirements
+
+- Platform: Raspberry Pi hardware (ARM64 architecture)
+
+- Operating system: Raspberry Pi OS Bookworm or later
+
+- Storage: NVMe SSD recommended for image hosting
+
+- Memory: Sufficient for image caching (depends on OS image size)
+
+Scaling
+
+- Horizontal: Multiple provisioning servers, each handling subset of
+  devices
+
+- Vertical: Single server with multiple USB hubs for parallel
+  provisioning
+
+- Database: SQLite adequate for single server; export and merge for
+  multi-server deployments
+
+Backup and Recovery
+
+Critical data to backup:
+
+- Customer signing keys (CUSTOMER_KEY_FILE_PEM)
+
+- Configuration file (/etc/rpi-sb-provisioner/config)
+
+- Manufacturing database (if enabled)
+
+- OS master images
+
+Not needed for backup:
+
+- Logs (useful for troubleshooting but not required for operation)
+
+- State files (ephemeral; recreated during provisioning)
+
+- Cache directories (recreated as needed)
+
+Troubleshooting Architecture
+
+Service Dependency Chain
+
+If provisioning fails, check in order:
+
+1.  udev rules: udevadm test /sys/… - Verify rule matches
+
+2.  systemd services: systemctl status rpi-sb-* - Check service state
+
+3.  Shell scripts: Logs in /var/log/rpi-sb-provisioner/<serial>/ -
+    Examine command output
+
+4.  State files: /var/run/rpi-sb-state/<serial>/ - Verify phase
+    transitions
+
+Common Issues
+
+Device not detected:
+
+- Check udev rules are installed:
+  /lib/udev/rules.d/60-rpi-sb-provisioner.rules
+
+- Verify USB connection and device state
+
+- Test with lsusb to confirm device is visible
+
+Service not starting:
+
+- Check systemd service files are installed:
+  /lib/systemd/system/rpi-sb-*.service
+
+- Verify scripts are executable: /usr/bin/rpi-sb-*.sh
+
+- Check for lock directory conflicts: /var/lock/rpi-sb-provisioner/
+
+Provisioning fails:
+
+- Examine logs: /var/log/rpi-sb-provisioner/<serial>/*.log
+
+- Check configuration: /etc/rpi-sb-provisioner/config
+
+- Verify image file exists and is readable
+
+Summary
+
+The rpi-sb-provisioner architecture prioritizes transparency,
+auditability, and maintainability. By using standard Linux components
+(udev, systemd, shell scripts) and explicit operations, the system
+ensures that users can understand, monitor, and trust the provisioning
+process. The separation of concerns between device detection, workflow
+orchestration, provisioning operations, and user interface allows each
+component to be tested, debugged, and maintained independently.
+
+For implementation details, see:
+
+- Configuration Reference - All configuration options
+
+- API Documentation - Web service integration
+
+- Device Guidance - Device-specific procedures
+
+- Scaling Guide - Production deployment
+This document describes the API endpoints available in the
+provisioner-service. These endpoints can be used for integration with
+other systems, building custom dashboards, or automating operations.
+
+The API documentation is organized into the following sections. Click on
+any section to view the detailed documentation.
+
+Core API Sections
+
+Manufacturing Database API
+
+Access device provisioning records and manufacturing data collected
+during the provisioning process. Provides pagination support and
+detailed device information including hardware specifications, security
+settings, and provisioning timestamps.
+
+Key Endpoints:
+
+- GET /api/v2/manufacturing - Retrieve manufacturing database records
+  with optional filtering
+
+Use Cases: Building custom dashboards, integration with inventory
+systems, quality assurance tracking
+
+------------------------------------------------------------------------
+
+Devices API
+
+Monitor and manage devices during provisioning, including access to
+device logs and cryptographic keys. Provides detailed information about
+device state, IP addresses, and USB topology.
+
+Key Endpoints:
+
+- GET /devices - List all devices
+
+- GET /devices/{serialno} - Get device details
+
+- GET /devices/{serialno}/log/{type} - Retrieve device logs
+  (provisioner, bootstrap, triage)
+
+- GET /devices/{serialno}/key/public - Download public key
+
+- GET /devices/{serialno}/key/private - Download private key (DISABLED
+  BY DEFAULT - see security documentation)
+
+Use Cases: Real-time device monitoring, log retrieval for
+troubleshooting, key management
+
+Caution
+
+The private key download endpoint is disabled by default for security
+reasons. See the Devices API documentation for details on the security
+configuration required to enable it.
+
+------------------------------------------------------------------------
+
+Customisation API
+
+Full CRUD (Create, Read, Update, Delete) operations for managing
+customisation scripts that hook into various provisioning stages.
+Scripts can customize device configuration during bootstrap, filesystem
+mounting, and post-flash stages.
+
+Key Endpoints:
+
+- GET /customisation/list-scripts - List all scripts and hook points
+
+- GET /customisation/get-script - Retrieve script content
+
+- POST /customisation/save-script - Create or update scripts
+
+- POST /customisation/upload-script - Upload script files
+
+- POST /customisation/enable-script - Enable script execution
+
+- POST /customisation/disable-script - Disable script execution
+
+- POST /customisation/delete-script - Delete scripts
+
+- GET /customisation/list-hooks - List all available hook points
+
+- GET /customisation/create-script - Get template for new scripts
+
+Use Cases: Automated device customisation, deployment-specific
+configuration, fleet management
+
+------------------------------------------------------------------------
+
+QR Code Verification API
+
+Verify QR codes against the manufacturing database for device validation
+and quality control during the scanning process.
+
+Key Endpoints:
+
+- POST /api/v2/verify-qrcode - Verify if a QR code exists in the
+  manufacturing database
+
+Use Cases: Barcode scanner integration, mobile app validation, quality
+control workflows
+
+------------------------------------------------------------------------
+
+Services API
+
+Monitor provisioning services running on the system, retrieve service
+logs with pagination, and track service execution history through
+systemd journal integration.
+
+Key Endpoints:
+
+- GET /api/v2/services - List all provisioning services
+
+- GET /api/v2/service-log/{name} - Retrieve service logs with pagination
+
+Use Cases: Service monitoring, troubleshooting provisioning issues,
+historical service analysis
+
+------------------------------------------------------------------------
+
+Images API
+
+Complete lifecycle management of OS images including upload, download,
+metadata retrieval, and asynchronous SHA256 hash calculation with
+real-time progress updates.
+
+Key Endpoints:
+
+- GET /get-images - List all available images
+
+- GET /get-image-metadata - Get image metadata (size, modification time,
+  etc.)
+
+- GET /get-image-sha256 - Calculate or retrieve SHA256 hash
+
+- POST /upload-image - Upload new OS images
+
+- POST /delete-image - Delete images
+
+Use Cases: Image management, integrity verification, automated image
+deployment
+
+------------------------------------------------------------------------
+
+Configuration API
+
+Manage system configuration options, firmware selection for different
+device families, and working directory management.
+
+Key Endpoints:
+
+- GET /options/get - Retrieve all configuration values
+
+- POST /options/set - Update configuration
+
+- POST /options/clear-workdir - Clear working directory contents
+
+- GET /options/firmware - List available firmware versions
+
+- POST /options/firmware/set - Set firmware version
+
+- GET /options/firmware/notes/{version} - Get firmware release notes
+
+Use Cases: Configuration management, firmware updates, system
+administration
+
+------------------------------------------------------------------------
+
+Audit Log API
+
+Access security audit logs that track all system access, file
+operations, and sensitive actions. Supports filtering by event type,
+date range, and includes detailed client information.
+
+Key Endpoints:
+
+- GET /auditlog - Query audit logs with filtering
+
+Use Cases: Security monitoring, compliance auditing, incident
+investigation
+
+------------------------------------------------------------------------
+
+WebSocket APIs
+
+Real-time bidirectional communication for device topology updates and
+long-running operations like SHA256 hash calculations.
+
+Key Endpoints:
+
+- WS /ws/devices - Real-time device topology and provisioning status
+
+- WS /ws/sha256 - Real-time SHA256 calculation progress
+
+Use Cases: Live dashboards, progress monitoring, real-time device
+tracking
+
+------------------------------------------------------------------------
+
+Error Handling & Content Negotiation
+
+Standard error response format used across all endpoints, plus
+information about content negotiation between JSON and HTML responses.
+
+Topics Covered:
+
+- Standard error response format
+
+- HTTP status codes
+
+- Error codes and meanings
+
+- Content negotiation (Accept header handling)
+
+Use Cases: Error handling in client applications, debugging API issues
+
+Additional Resources
+
+- Configuration Variables - Complete reference for all configuration
+  options
+
+- API Documentation Structure - Information about how the documentation
+  is organized
+
+Quick Start
+
+For most integrations, you’ll want to start with:
+
+1.  Devices API - Monitor device provisioning status
+
+2.  Manufacturing Database API - Access provisioned device records
+
+3.  Services API - Monitor service execution
+
+For advanced customisation:
+
+1.  Customisation API - Manage provisioning scripts
+
+2.  Images API - Manage OS images
+
+3.  Configuration API - System configuration
+The Manufacturing Database API provides access to device provisioning
+data collected during the provisioning process. This API allows for
+integration with other systems and custom UIs.
+
+/api/v2/manufacturing
+
+HTTP Method: GET
+
+Description: Returns manufacturing database records in JSON format, with
+optional range support.
+
+Parameters:
+
+  Parameter   Typ       Require   Description
+  ----------- --------- --------- -------------------------------------------------------------------------------------------
+  offset      Integer   No        Number of records to skip (default: 0)
+  limit       Integer   No        Maximum number of records to return. If not specified or less than 1, returns all records
+
+Response Format:
+
+The endpoint returns a JSON array where each element represents a
+provisioned device with the following information:
+
+    [
+      {
+        "id": 1,
+        "boardname": "CM5",
+        "serial": "c561b701c85be8ea",
+        "eth_mac": "2c:cf:67:bd:78:4f",
+        "wifi_mac": "00:00:00:00:00:00",
+        "bt_mac": "00:00:00:00:00:00",
+        "mmc_size": 15634268160,
+        "mmc_cid": "150100414a5444345206c9e4baeeba00",
+        "rpi_duid": "0000911043955412",
+        "board_revision": "0x0",
+        "processor": "BCM2712",
+        "memory": "2GB",
+        "manufacturer": "Sony UK",
+        "secure": "yes",
+        "jtag_locked": "1",
+        "eeprom_write_protected": "1",
+        "pubkey_programmed": "1",
+        "devkey_revoked": "0",
+        "signed_boot_enabled": "1",
+        "os_image_filename": "raspios-2025-04-01.img",
+        "os_image_sha256": "4f2d9c5b0e3b1d8a9c1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c",
+        "provision_ts": "2025-04-28 13:53:28"
+      },
+      ...
+    ]
+
+Field Descriptions:
+
++-----------------------+----------------------------------------------+
+| Fiel                  | Description                                  |
++=======================+==============================================+
+| i                     | Unique identifier in the database            |
++-----------------------+----------------------------------------------+
+| boardnam              | Type of Raspberry Pi board (e.g., "CM5",     |
+|                       | "RPi5")                                      |
++-----------------------+----------------------------------------------+
+| seria                 |     Device serial number                     |
++-----------------------+----------------------------------------------+
+| eth_mac               | Ethernet MAC address                         |
++-----------------------+----------------------------------------------+
+| wifi_mac              | Wi-Fi MAC address (if applicable)            |
++-----------------------+----------------------------------------------+
+| bt_mac                | Bluetooth MAC address (if applicable)        |
++-----------------------+----------------------------------------------+
+| mmc_siz               | Storage size in bytes                        |
++-----------------------+----------------------------------------------+
+| mmc_ci                | MMC Card ID                                  |
++-----------------------+----------------------------------------------+
+| rpi_dui               | Raspberry Pi Device Unique Identifier        |
++-----------------------+----------------------------------------------+
+| board_revision        | Board revision code                          |
++-----------------------+----------------------------------------------+
+| processor             | Processor type (e.g., "BCM2712")             |
++-----------------------+----------------------------------------------+
+| memory                | Device memory size (e.g., "2GB")             |
++-----------------------+----------------------------------------------+
+| manufacturer          | Device manufacturer                          |
++-----------------------+----------------------------------------------+
+| secur                 | Whether a device has been provisioned with a |
+|                       | device unique identity                       |
++-----------------------+----------------------------------------------+
+| jtag_locke            | JTAG debugging lock status (1=locked,        |
+|                       | 0=unlocked, null=unknown)                    |
++-----------------------+----------------------------------------------+
+| eeprom_write_protecte | EEPROM write protection status (1=enabled,   |
+|                       | 0=disabled, null=unknown)                    |
++-----------------------+----------------------------------------------+
+| pubkey_programme      | Customer public key programming status       |
+|                       | (1=programmed, 0=not programmed,             |
+|                       | null=unknown)                                |
++-----------------------+----------------------------------------------+
+| signed_boot_enable    | Signed boot enablement status (1=enabled,    |
+|                       | 0=disabled, null=unknown)                    |
++=======================+==============================================+
+| provision_t           | Timestamp of when the device was provisioned |
++=======================+==============================================+
+
+Example Usage:
+
+To retrieve the first 10 provisioned devices:
+
+    curl http://localhost:3142/api/v2/manufacturing?limit=10
+
+To retrieve 20 devices after skipping the first 10:
+
+    curl http://localhost:3142/api/v2/manufacturing?offset=10&limit=20
+
+To retrieve all devices:
+
+    curl http://localhost:3142/api/v2/manufacturing
+
+Error Responses:
+
+On error, the endpoint returns a JSON object with error details:
+
+    {
+      "error": {
+        "status": 500,
+        "title": "Database Error",
+        "code": "DB_ERROR",
+        "detail": "Failed to retrieve manufacturing database data"
+      }
+    }
+
+Notes:
+
+- This endpoint can be used for building custom dashboards or
+  integrating with other monitoring systems.
+
+- The data is ordered by provision timestamp in descending order (newest
+  first).
+
+- For large datasets, it is recommended to use pagination to improve
+  performance.
+
+- The database path is configured using the
+  RPI_SB_PROVISIONER_MANUFACTURING_DB setting as described in the
+  configuration documentation.
+The Audit Log API provides access to security audit logs that track all
+system access and operations.
+
+/auditlog
+
+HTTP Method: GET
+
+Description: Retrieves audit log entries with optional filtering.
+
+Parameters:
+
++-----------+--------+---------+---------+----------------------------------------------------------------------------+
+| Parameter | Typ    | Require | Default | Description                                                                |
++===========+========+=========+=========+============================================================================+
+| event_typ | String | No      | Al      |     Filter by event type (HANDLER_ACCESS, FILE_ACCESS, SYSTEMD_LOG_ACCESS) |
++-----------+--------+---------+---------+----------------------------------------------------------------------------+
+| start_dat | String | No      | Non     | Filter entries after this date (YYYY-MM-DD HH:MM:SS)                       |
++-----------+--------+---------+---------+----------------------------------------------------------------------------+
+| end_dat   | String | No      | Non     | Filter entries before this date (YYYY-MM-DD HH:MM:SS)                      |
++===========+========+=========+=========+============================================================================+
+| limit     | String | No      | 100     | Maximum number of entries to return                                        |
++===========+========+=========+=========+============================================================================+
+
+Response Format:
+
+    {
+      "audit_entries": [
+        {
+          "id": "123",
+          "timestamp": "2025-01-25 14:30:45",
+          "event_type": "HANDLER_ACCESS",
+          "client_ip": "192.168.1.100",
+          "user_agent": "Mozilla/5.0...",
+          "handler_path": "/api/v2/manufacturing"
+        },
+        {
+          "id": "124",
+          "timestamp": "2025-01-25 14:31:02",
+          "event_type": "FILE_ACCESS",
+          "operation": "DELETE",
+          "target_path": "/srv/rpi-sb-provisioner/images/old-image.img",
+          "success": "Yes",
+          "additional_info": "Image file deleted"
+        }
+      ],
+      "count": 2
+    }
+
+Event Types:
+
+  Event Typ            Description
+  -------------------- -----------------------------------------------------------
+  HANDLER_ACCESS       HTTP endpoint access
+  FILE_ACCESS          File system operations (read, write, delete, chmod, etc.)
+  SYSTEMD_LOG_ACCESS   Access to systemd service logs
+
+Notes:
+
+- All API access and sensitive operations are automatically logged
+
+- Audit logs include client IP, user agent, and timestamps
+
+- Logs are stored in SQLite database at /srv/rpi-sb-provisioner/audit.db
+
+- Database has restricted permissions (0640)
+The Customisation API provides full CRUD (Create, Read, Update, Delete)
+operations for managing customisation scripts. These scripts allow you
+to customize the provisioning process at various stages.
+
+/customisation/list-scripts
+
+HTTP Method: GET
+
+Description: Lists all available customisation scripts and hook points
+in the system.
+
+Parameters: None
+
+Response Format:
+
+The endpoint returns a JSON object containing script information:
+
+    {
+      "scripts": [
+        {
+          "filename": "secure-boot-post-flash.sh",
+          "exists": true,
+          "enabled": true,
+          "provisioner": "secure-boot",
+          "stage": "post-flash",
+          "description": "Runs after images have been flashed to the device"
+        },
+        ...
+      ]
+    }
+
+/customisation/get-script
+
+HTTP Method: GET
+
+Description: Retrieves the content and metadata of a specific
+customisation script.
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -------------------------------------
+  script      String   Ye        Name of the script file to retrieve
+
+Response Format:
+
+The endpoint returns a JSON object with script details:
+
+    {
+      "exists": true,
+      "filename": "secure-boot-post-flash.sh",
+      "content": "#!/bin/sh\n\n# Script content here...",
+      "enabled": true
+    }
+
+Error Responses:
+
+If the script name is missing:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Missing Parameter",
+        "code": "MISSING_SCRIPT_NAME",
+        "detail": "Script name is required"
+      }
+    }
+
+If the script is not found:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Script Not Found",
+        "code": "SCRIPT_NOT_FOUND",
+        "detail": "The requested script file could not be found"
+      }
+    }
+
+Notes:
+
+- For known hook points that don’t exist yet, the API will return a
+  template with default content.
+
+- The enabled flag indicates if the script has executable permissions.
+
+/customisation/delete-script
+
+HTTP Method: POST
+
+Description: Deletes a customisation script from the system.
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- ------------------------------------------------------
+  script      String   Ye        Name of the script to delete (without .sh extension)
+
+Response Format:
+
+Plain text success message: "Script deleted successfully"
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 500,
+        "title": "Deletion Error",
+        "code": "SCRIPT_DELETE_ERROR",
+        "detail": "Failed to delete script file"
+      }
+    }
+
+/customisation/disable-script
+
+HTTP Method: POST
+
+Description: Disables a script by removing its executable permissions
+(sets permissions to 0644).
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -------------------------------------------------------
+  script      String   Ye        Name of the script to disable (without .sh extension)
+
+Response Format:
+
+Plain text success message: "Script disabled successfully"
+
+/customisation/enable-script
+
+HTTP Method: POST
+
+Description: Enables a script by adding executable permissions (sets
+permissions to 0755).
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- ------------------------------------------------------
+  script      String   Ye        Name of the script to enable (without .sh extension)
+
+Response Format:
+
+Plain text success message: "Script enabled successfully"
+
+/customisation/save-script
+
+HTTP Method: POST
+
+Description: Saves or updates a customisation script with new content.
+
+Request Format:
+
+    {
+      "filename": "sb-provisioner-post-flash",
+      "content": "#!/bin/sh\n\necho \"Custom script content\"\nexit 0\n"
+    }
+
+Response Format:
+
+Returns JSON with updated script metadata including SHA256 hash:
+
+    {
+      "filename": "sb-provisioner-post-flash.sh",
+      "executable": true,
+      "enabled": true,
+      "sha256": "abc123...",
+      "provisioner": "sb-provisioner",
+      "stage": "post-flash",
+      "description": "Runs after images have been flashed to the device"
+    }
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Missing Fields",
+        "code": "MISSING_REQUIRED_FIELDS",
+        "detail": "Filename and content are required fields"
+      }
+    }
+
+Notes:
+
+- New scripts are created with non-executable permissions (0644)
+
+- Existing scripts preserve their original permissions when updated
+
+- The .sh extension is automatically added if not present
+
+/customisation/upload-script
+
+HTTP Method: POST
+
+Description: Uploads a script file via multipart/form-data.
+
+Request Format:
+
+Multipart form data with a field named "script" containing the file.
+
+Response Format:
+
+Plain text success message: "Script file uploaded successfully"
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Missing File",
+        "code": "MISSING_SCRIPT_FILE",
+        "detail": "Script file is required in the form data with field name 'script'"
+      }
+    }
+
+Notes:
+
+- Uploaded scripts are automatically set to executable (0755)
+
+- The .sh extension is automatically added if not present
+
+/customisation/list-hooks
+
+HTTP Method: GET
+
+Description: Lists all available hook points for customisation scripts,
+including provisioners, stages, and their descriptions.
+
+Parameters: None
+
+Response Format:
+
+    {
+      "provisioners": ["sb-provisioner", "fde-provisioner", "naked-provisioner"],
+      "stages": [
+        {
+          "name": "bootstrap",
+          "description": "Executed when a device is detected, before provisioning begins"
+        },
+        {
+          "name": "bootfs-mounted",
+          "description": "Executed after boot image is mounted, before modifications"
+        }
+      ],
+      "hooks": [
+        {
+          "filename": "sb-provisioner-bootstrap.sh",
+          "provisioner": "sb-provisioner",
+          "stage": "bootstrap",
+          "exists": true,
+          "enabled": true
+        }
+      ]
+    }
+
+Notes:
+
+- This endpoint provides a comprehensive list of all possible
+  customisation points
+
+- The exists field indicates whether a script file currently exists for
+  that hook
+
+- The enabled field indicates whether the script has executable
+  permissions
+
+/customisation/create-script
+
+HTTP Method: GET
+
+Description: Returns a default template for creating a new customisation
+script.
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -------------------------------------------------------
+  script      String   Ye        Name of the script (e.g., "sb-provisioner-bootstrap")
+
+Response Format:
+
+    {
+      "exists": false,
+      "filename": "sb-provisioner-bootstrap",
+      "content": "#!/bin/sh\n\n# Script template content...",
+      "enabled": false
+    }
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Invalid Script Name",
+        "code": "INVALID_SCRIPT_NAME",
+        "detail": "The script name is not a valid hook point"
+      }
+    }
+The Devices API provides access to information about devices being
+provisioned, their logs, and associated cryptographic keys.
+
+/devices
+
+HTTP Method: GET
+
+Description: Returns a list of all devices currently being provisioned
+or previously provisioned by the system.
+
+Parameters: None
+
+Response Format:
+
+The endpoint returns a JSON object containing an array of devices:
+
+    {
+      "devices": [
+        {
+          "serial": "10000000abcdef",
+          "port": "usb:1-1.4",
+          "ip_address": "192.168.1.100",
+          "state": "provisioning",
+          "image": "raspios-trixie.img"
+        },
+        ...
+      ]
+    }
+
+Field Descriptions:
+
++-----------+----------------------------------------------------------+
+| Fiel      | Description                                              |
++===========+==========================================================+
+| seria     |     Device serial number                                 |
++-----------+----------------------------------------------------------+
+| port      | USB endpoint or port identifier                          |
++-----------+----------------------------------------------------------+
+| ip_addres | IP address assigned to the device during provisioning    |
++-----------+----------------------------------------------------------+
+| stat      | Current state of the device (e.g., "bootstrap",          |
+|           | "triage", "provisioning", "complete")                    |
++===========+==========================================================+
+| imag      | OS image being provisioned to the device                 |
++===========+==========================================================+
+
+/devices/{serialno}
+
+HTTP Method: GET
+
+Description: Returns detailed information about a specific device
+identified by its serial number.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------------
+  serialno    String   Ye        Serial number of the device
+
+Response Format:
+
+The endpoint returns a JSON object with device details:
+
+    {
+      "serial": "10000000abcdef",
+      "port": "usb:1-1.4",
+      "state": "provisioning"
+    }
+
+Error Responses:
+
+If the device is not found:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Device Not Found",
+        "code": "DEVICE_NOT_FOUND",
+        "detail": "Requested serial: 10000000abcdef"
+      }
+    }
+
+Device Log Endpoints
+
+/devices/{serialno}/log/provisioner
+
+HTTP Method: GET
+
+Description: Returns the provisioner log file for a specific device.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------------
+  serialno    String   Ye        Serial number of the device
+
+Response Format:
+
+Plain text log file content.
+
+Error Responses:
+
+If the log file is not found:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Log Not Found",
+        "code": "LOG_NOT_FOUND",
+        "detail": "Attempted path: /var/log/rpi-sb-provisioner/{serialno}/provisioner.log"
+      }
+    }
+
+/devices/{serialno}/log/bootstrap
+
+HTTP Method: GET
+
+Description: Returns the bootstrap log file for a specific device.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------------
+  serialno    String   Ye        Serial number of the device
+
+Response Format:
+
+Plain text log file content.
+
+/devices/{serialno}/log/triage
+
+HTTP Method: GET
+
+Description: Returns the triage log file for a specific device.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------------
+  serialno    String   Ye        Serial number of the device
+
+Response Format:
+
+Plain text log file content.
+
+Device Key Endpoints
+
+/devices/{serialno}/key/public
+
+HTTP Method: GET
+
+Description: Downloads the public key file for a specific device.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------------
+  serialno    String   Ye        Serial number of the device
+
+Response Format:
+
+Binary file (Content-Type: application/octet-stream) containing the
+device’s public key.
+
+Error Responses:
+
+If the key file is not found:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Key Not Found",
+        "code": "KEY_NOT_FOUND",
+        "detail": "Attempted path: /var/log/rpi-sb-provisioner/{serialno}/keypair/{serialno}.pub"
+      }
+    }
+
+/devices/{serialno}/key/private
+
+Caution
+
+SECURITY-CRITICAL ENDPOINT - DISABLED BY DEFAULT
+
+This endpoint exposes device private keys via HTTP and is DISABLED by
+default for security reasons. Private keys are cryptographic secrets
+that should never be transmitted over insecure channels.
+
+HTTP Method: GET
+
+Description: Downloads the private key file for a specific device in DER
+format.
+
+Security Configuration:
+
+This endpoint is disabled by default and requires explicit configuration
+to enable:
+
+1.  Edit /etc/rpi-sb-provisioner/config
+
+2.  Add the following line:
+
+        RPI_SB_PROVISIONER_ENABLE_PRIVATE_KEY_API=true
+
+3.  Restart the provisioner service
+
+4.  WARNING: Only enable in secure, isolated networks
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------------
+  serialno    String   Ye        Serial number of the device
+
+Response Format:
+
+Binary file (Content-Type: application/octet-stream) containing the
+device’s private key in DER format.
+
+Error Responses:
+
+If the endpoint is disabled (default):
+
+    {
+      "error": {
+        "status": 403,
+        "title": "Endpoint Disabled",
+        "code": "PRIVATE_KEY_API_DISABLED",
+        "detail": "Private key download API is disabled for security reasons. This endpoint must be explicitly enabled in configuration: Set RPI_SB_PROVISIONER_ENABLE_PRIVATE_KEY_API=true in /etc/rpi-sb-provisioner/config. WARNING: Enabling this endpoint exposes device private keys via HTTP and should only be done in secure, isolated networks.",
+        "additional": "This is a security feature. Private keys are cryptographic secrets that should not be transmitted over HTTP."
+      }
+    }
+
+If the key file is not found:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Key Not Found",
+        "code": "KEY_NOT_FOUND",
+        "detail": "Attempted path: /var/log/rpi-sb-provisioner/{serialno}/keypair/{serialno}.der"
+      }
+    }
+
+Security Notes:
+
+Important
+
+This endpoint presents significant security risks:
+
+- Private keys are cryptographic secrets that provide complete control
+  over device identity
+
+- Transmitting private keys over HTTP is inherently insecure, even on
+  "private" networks
+
+- All access attempts (successful and failed) are logged to the audit
+  log
+
+- Each private key download generates WARNING level logs
+
+- Consider using physical media (USB drive) or secure file transfer
+  methods instead
+
+Only enable this endpoint if:
+
+- You are in a completely isolated test/development environment
+
+- You have no other means of retrieving the keys
+
+- You understand and accept the security implications
+
+- You can monitor the audit logs for unauthorized access
+
+Audit Logging:
+
+All activity on this endpoint is heavily audited:
+
+- Denied access attempts are logged with client IP address
+
+- Successful downloads are logged as CRITICAL security events
+
+- Logs include client IP, User-Agent, and serial number
+
+- All events appear in /srv/rpi-sb-provisioner/audit.db
+
+Alternatives to Consider:
+
+Instead of using this endpoint, consider:
+
+1.  Physical retrieval: Access keys directly from
+    /var/log/rpi-sb-provisioner/{serialno}/keypair/ on the server
+
+2.  Secure file transfer: Use scp or sftp over SSH
+
+3.  Out-of-band delivery: Deliver keys via secure USB drive
+
+4.  Key management system: Integrate with a proper secrets management
+    solution
+The Images API provides complete management of OS images used for device
+provisioning, including upload, download, metadata retrieval, and SHA256
+hash calculation.
+
+/get-images
+
+HTTP Method: GET
+
+Description: Lists all available OS images in the system.
+
+Parameters: None
+
+Response Format:
+
+    [
+      {
+        "name": "raspios-2025-04-01.img",
+        "sha256": "abc123..."
+      },
+      {
+        "name": "raspios-2025-03-15.img",
+        "sha256": "Calculating..."
+      }
+    ]
+
+Field Descriptions:
+
+  Fiel     Description
+  -------- ---------------------------------------------------------------
+  nam      Filename of the image
+  sha256   SHA256 hash of the image (or status: "Calculating…", "Error")
+
+Notes:
+
+- SHA256 hashes are calculated asynchronously in the background
+
+- Images with "Calculating…" status will have their hash computed
+  automatically
+
+- sha256 sidecar files are not included in the listing
+
+  == /get-image-metadata
+
+HTTP Method: GET
+
+Description: Retrieves detailed metadata for a specific image.
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------
+  nam         String   Ye        Filename of the image
+
+Response Format:
+
+    {
+      "name": "raspios-2025-04-01.img",
+      "size_bytes": 4294967296,
+      "size_mb": 4096.0,
+      "size_formatted": "4.00 GB",
+      "last_modified": "2025-04-01 10:30:45",
+      "estimated_process_minutes": 103
+    }
+
+Field Descriptions:
+
+  Fiel                       Description
+  -------------------------- --------------------------------------------------------
+  nam                        Filename of the image
+  size_byte                  File size in bytes
+  size_mb                    File size in megabytes
+  size_formatte              Human-readable file size
+  last_modifie               Last modification timestamp
+  estimated_process_minute   Estimated time to process this image (based on 40MB/s)
+
+/get-image-sha256
+
+HTTP Method: GET
+
+Description: Retrieves or initiates SHA256 hash calculation for a
+specific image.
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- -----------------------
+  nam         String   Ye        Filename of the image
+
+Response Format:
+
+When calculation is complete:
+
+    {
+      "sha256": "abc123def456...",
+      "status": "complete"
+    }
+
+When calculation is in progress:
+
+    {
+      "sha256": "Calculating...",
+      "status": "pending",
+      "message": "SHA256 calculation is in progress.",
+      "progress": 0.45,
+      "progress_percent": 45
+    }
+
+Notes:
+
+- If the hash is not cached, this endpoint will initiate background
+  calculation
+
+- Use WebSocket endpoint /ws/sha256 for real-time progress updates
+
+- SHA256 results are cached and stored in sidecar files (.sha256)
+
+/upload-image
+
+HTTP Method: POST
+
+Description: Uploads a new OS image file to the system.
+
+Request Format:
+
+Multipart form data with the image file.
+
+Response Format:
+
+    {
+      "success": true,
+      "message": "File uploaded successfully",
+      "filename": "raspios-2025-04-01.img",
+      "renamed": false,
+      "sha256": "Calculating..."
+    }
+
+If a file with the same name exists, it will be automatically renamed:
+
+    {
+      "success": true,
+      "message": "File uploaded successfully (renamed to avoid conflict)",
+      "original_filename": "raspios.img",
+      "filename": "raspios_1.img",
+      "renamed": true,
+      "sha256": "Calculating..."
+    }
+
+Notes:
+
+- Files are automatically renamed if a conflict is detected
+
+- SHA256 calculation begins automatically after upload
+
+- Supports very large image files (multi-GB)
+
+/delete-image
+
+HTTP Method: POST
+
+Description: Deletes an OS image file from the system.
+
+Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- ---------------------------------
+  nam         String   Ye        Filename of the image to delete
+
+Response Format:
+
+HTTP 200 OK with no body on success.
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Image Not Found",
+        "code": "IMAGE_NOT_FOUND",
+        "detail": "Requested image: raspios-2025-04-01.img"
+      }
+    }
+
+Notes:
+
+- Deleting an image will cancel any ongoing SHA256 calculation
+
+- Both the image file and its .sha256 sidecar file are removed
+The QR Code Verification API provides endpoints for validating QR codes
+against the manufacturing database.
+
+/api/v2/verify-qrcode
+
+HTTP Method: POST
+
+Description: Verifies if a QR code value exists in the manufacturing
+database, typically used for device validation during scanning.
+
+Request Format:
+
+    {
+      "qrcode": "10000000abcdef"
+    }
+
+Response Format:
+
+The endpoint returns a JSON object with verification results:
+
+    {
+      "success": true,
+      "exists": true,
+      "qrcode": "10000000abcdef"
+    }
+
+Field Descriptions:
+
+  Fiel     Description
+  -------- ------------------------------------------------------------------------
+  succes   Indicates if the verification check was performed successfully
+  exist    Indicates if the QR code value was found in the manufacturing database
+  qrcod    The QR code value that was checked
+
+Error Responses:
+
+If using an invalid HTTP method:
+
+    {
+      "error": {
+        "status": 405,
+        "title": "Method Error",
+        "code": "METHOD_NOT_ALLOWED",
+        "detail": "Only POST method is allowed"
+      }
+    }
+
+If QR code parameter is missing:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Parameter Error",
+        "code": "INVALID_PARAMETER",
+        "detail": "Missing or invalid 'qrcode' parameter in request body"
+      }
+    }
+
+Notes:
+
+- This endpoint is particularly useful for integration with barcode
+  scanners or mobile applications.
+
+- The QR code value is checked against the rpi_duid field in the
+  manufacturing database.
+WebSocket endpoints provide real-time updates for long-running
+operations and dynamic data.
+
+/ws/devices
+
+Protocol: WebSocket
+
+Description: Provides real-time updates on device topology, including
+USB connections, provisioning status, and device states.
+
+Message Format:
+
+Server sends JSON messages with current topology:
+
+    {
+      "type": "topology",
+      "timestamp": 1706191845000,
+      "nodes": [
+        {
+          "id": "1-1.4",
+          "parentId": "server",
+          "isHub": false,
+          "vendor": "0a5c",
+          "product": "2712",
+          "productName": "BCM2712 Boot",
+          "serial": "c561b701c85be8ea",
+          "state": "provisioning",
+          "image": "raspios-2025-04-01.img",
+          "model": "CM5",
+          "ip": "192.168.1.100",
+          "modelGen": 5
+        }
+      ],
+      "removed": ["1-1.3"]
+    }
+
+Notes:
+
+- Automatically sends topology snapshot on connection
+
+- Broadcasts updates when devices connect/disconnect or state changes
+
+- Includes placeholder nodes for empty hub ports
+
+- The removed array lists device IDs that were disconnected
+
+/ws/sha256
+
+Protocol: WebSocket
+
+Description: Provides real-time progress updates for SHA256 hash
+calculations of image files.
+
+Client Messages:
+
+Request SHA256 calculation:
+
+    {
+      "action": "get_sha256",
+      "image_name": "raspios-2025-04-01.img"
+    }
+
+Server Messages:
+
+Progress update:
+
+    {
+      "image_name": "raspios-2025-04-01.img",
+      "status": "pending",
+      "progress": 0.45,
+      "progress_percent": 45
+    }
+
+Complete:
+
+    {
+      "image_name": "raspios-2025-04-01.img",
+      "status": "complete",
+      "sha256": "abc123def456..."
+    }
+
+Error:
+
+    {
+      "image_name": "raspios-2025-04-01.img",
+      "status": "error",
+      "error": "Failed to read file"
+    }
+
+Notes:
+
+- Multiple clients can subscribe to the same image calculation
+
+- Progress updates are sent approximately every 5% of completion
+
+- Calculations are automatically cancelled when no clients are listening
+
+- SHA256 sidecar files (.sha256) are not hashable and will return an
+  error
+The Configuration API provides endpoints for managing system
+configuration options, firmware selection, and working directory
+management.
+
+/options/get
+
+HTTP Method: GET
+
+Description: Retrieves all current configuration values.
+
+Parameters: None
+
+Response Format:
+
+    {
+      "GOLD_MASTER_OS_FILE": "/srv/rpi-sb-provisioner/images/raspios-2025-04-01.img",
+      "RPI_SB_WORKDIR": "/srv/rpi-sb-provisioner/work",
+      "RPI_SB_PROVISIONER_MANUFACTURING_DB": "/srv/rpi-sb-provisioner/manufacturing.db",
+      "RPI_DEVICE_FAMILY": "5",
+      "RPI_DEVICE_FIRMWARE_FILE": "/lib/firmware/raspberrypi/bootloader-2712/default/pieeprom-2025-01-17.bin"
+    }
+
+Notes:
+
+- Returns all configuration key-value pairs from
+  /etc/rpi-sb-provisioner/config
+
+- Configuration values control provisioning behavior
+
+/options/set
+
+HTTP Method: POST
+
+Description: Updates one or more configuration values.
+
+Request Format:
+
+    {
+      "GOLD_MASTER_OS_FILE": "/srv/rpi-sb-provisioner/images/new-image.img",
+      "RPI_DEVICE_FAMILY": "5"
+    }
+
+Response Format:
+
+HTTP 200 OK with no body on success.
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 500,
+        "title": "Config Error",
+        "code": "CONFIG_WRITE_ERROR",
+        "detail": "Failed to write configuration file"
+      }
+    }
+
+Notes:
+
+- Merges provided values with existing configuration
+
+- Automatically creates manufacturing database file if path is set and
+  file doesn’t exist
+
+- Clears working directory contents if RPI_SB_WORKDIR is modified
+
+/options/validate
+
+HTTP Method: POST
+
+Description: Validates a single configuration field value before saving.
+Performs field-specific validation including file path checks on disk.
+
+Request Format:
+
+    {
+      "field": "GOLD_MASTER_OS_FILE",
+      "value": "/srv/rpi-sb-provisioner/images/raspios-2025-04-01.img"
+    }
+
+Response Format (Success):
+
+    {
+      "valid": true,
+      "field": "GOLD_MASTER_OS_FILE"
+    }
+
+Response Format (Success with Info):
+
+    {
+      "valid": true,
+      "field": "RPI_SB_PROVISIONER_MANUFACTURING_DB",
+      "message": "File will be created on save"
+    }
+
+Response Format (Validation Failure):
+
+    {
+      "valid": false,
+      "field": "GOLD_MASTER_OS_FILE",
+      "error": "Image file does not exist at specified path"
+    }
+
+Validation Rules:
+
+File Path Fields (must exist and be readable):
+
+- CUSTOMER_KEY_FILE_PEM - RSA private key file
+
+- GOLD_MASTER_OS_FILE - Must have .img extension (mandatory)
+
+- RPI_DEVICE_BOOTLOADER_CONFIG_FILE - Bootloader configuration file
+
+Directory Path Fields (must exist or be creatable):
+
+- RPI_SB_WORKDIR - Working directory for cached assets
+
+- RPI_DEVICE_RETRIEVE_KEYPAIR - Directory for storing device keypairs
+
+Database Path Fields:
+
+- RPI_SB_PROVISIONER_MANUFACTURING_DB - SQLite database path (mandatory,
+  parent directory must exist)
+
+Enumerated Values:
+
+- PROVISIONING_STYLE - Must be secure-boot, fde-only, or naked
+
+- RPI_DEVICE_FAMILY - Must be 4, 5, or 2W
+
+- RPI_DEVICE_STORAGE_TYPE - Must be sd, emmc, or nvme
+
+- RPI_DEVICE_STORAGE_CIPHER - Must be aes-xts-plain64 or
+  xchacha12,aes-adiantum-plain64
+
+Format-Specific:
+
+- CUSTOMER_KEY_PKCS11_NAME - Must start with pkcs11: and include object=
+  and type=private parameters
+
+Security Measures:
+
+- HTTP Method Restriction: Only accepts POST requests; returns 405
+  Method Not Allowed for other methods
+
+- Dynamic Field Whitelist: Only validates fields that exist in the
+  configuration file; rejects unknown fields
+
+- Path Canonicalization: File paths are canonicalized to prevent path
+  traversal attacks (../)
+
+- Path Validation: Rejects paths with suspicious patterns after
+  normalization
+
+- Audit Logging: All validation requests are logged with client IP
+  addresses
+
+- Input Validation: JSON body is validated before processing
+
+- No Execution: Endpoint only reads from filesystem, never writes or
+  executes
+
+Notes:
+
+- Used by the web UI for real-time field validation
+
+- Always returns HTTP 200 with JSON indicating validation
+  success/failure
+
+- File system checks verify actual file/directory existence and
+  permissions
+
+- Does not modify configuration - use /options/set to save values
+
+- Failed validation attempts for unknown fields are logged as security
+  warnings
+
+/options/clear-workdir
+
+HTTP Method: POST
+
+Description: Clears all contents of the working directory specified in
+RPI_SB_WORKDIR configuration.
+
+Parameters: None
+
+Response Format:
+
+HTTP 200 OK with no body on success.
+
+Notes:
+
+- Useful when switching OS images or resetting provisioning state
+
+- Does not delete the working directory itself, only its contents
+
+- Safe to call even if directory doesn’t exist
+
+Firmware Management
+
+/options/firmware
+
+HTTP Method: GET
+
+Description: Lists available firmware versions for the configured device
+family.
+
+Parameters: None
+
+Response Format:
+
+Returns HTML view with firmware list, release notes, and selection
+interface.
+
+Notes:
+
+- Scans /lib/firmware/raspberrypi/bootloader-{chip}/ for available
+  firmware
+
+- Automatically groups firmware by version across release channels
+
+- Shows firmware from default, latest, beta, stable, and critical
+  channels
+
+/options/firmware/set
+
+HTTP Method: POST
+
+Description: Sets the selected firmware file for device provisioning.
+
+Request Format:
+
+    {
+      "firmware_path": "/lib/firmware/raspberrypi/bootloader-2712/default/pieeprom-2025-01-17.bin"
+    }
+
+Response Format:
+
+HTTP 200 OK with no body on success.
+
+Error Responses:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Invalid Request",
+        "code": "FIRMWARE_NOT_FOUND",
+        "detail": "Selected firmware file does not exist"
+      }
+    }
+
+/options/firmware/notes/{version}
+
+HTTP Method: GET
+
+Description: Retrieves release notes for a specific firmware version.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- ---------------------------------------
+  version     String   Ye        Firmware version in YYYY-MM-DD format
+
+Response Format:
+
+    {
+      "version": "2025-01-17",
+      "notes": "## 2025-01-17: Description\n\n* Feature 1\n* Bug fix 2\n"
+    }
+
+Error Responses:
+
+    {
+      "error": "No release notes found for version 2025-01-17"
+    }
+All API endpoints follow a standard error response format:
+
+    {
+      "error": {
+        "status": 400,
+        "title": "Error Title",
+        "code": "ERROR_CODE",
+        "detail": "Detailed error message",
+        "additional": "Optional additional information"
+      }
+    }
+
+Field Descriptions:
+
++-----------+------------------------------------------------------------------+
+| Fiel      | Description                                                      |
++===========+==================================================================+
+| statu     | HTTP status code                                                 |
++-----------+------------------------------------------------------------------+
+| titl      | Brief error title                                                |
++-----------+------------------------------------------------------------------+
+| cod       | Machine-readable error code                                      |
++-----------+------------------------------------------------------------------+
+| detai     |     Human-readable error description                             |
++===========+==================================================================+
+| additiona |     Optional additional context information (not always present) |
++===========+==================================================================+
+
+Content Negotiation
+
+Most endpoints support content negotiation through the Accept header:
+
+- Accept: application/json - Returns JSON response
+
+- Accept: text/html - Returns HTML view when available
+
+If no Accept header is provided or if it doesn’t contain a supported
+MIME type, the API defaults to returning JSON responses.
+The Services API provides access to information about provisioning
+services running on the system. These endpoints allow monitoring of
+service states and retrieving service logs.
+
+/api/v2/services
+
+HTTP Method: GET
+
+Description: Returns information about all provisioning services
+discovered on the system. This includes both currently active services
+and previously run services found in the systemd journal.
+
+Parameters: None
+
+Response Format:
+
+The endpoint returns a JSON object containing an array of services:
+
+    {
+      "services": [
+        {
+          "name": "rpi-sb-provisioner@",
+          "status": "exited",
+          "active": "inactive",
+          "instance": "10000000abcdef",
+          "base_name": "rpi-sb-provisioner",
+          "full_name": "rpi-sb-provisioner@10000000abcdef.service"
+        },
+        {
+          "name": "rpi-naked-provisioner",
+          "status": "running",
+          "active": "active",
+          "instance": "",
+          "base_name": "rpi-naked-provisioner",
+          "full_name": "rpi-naked-provisioner.service"
+        }
+      ]
+    }
+
+Field Descriptions:
+
+  Fiel       Description
+  ---------- ----------------------------------------------------------------------------
+  nam        Service name, including @ symbol for instance services
+  statu      Current sub-state of the service (e.g., "running", "exited", "failed")
+  activ      Current active state of the service (e.g., "active", "inactive", "failed")
+  instanc    Instance parameter for template services (empty for non-template services)
+  base_nam   Base service name without @ symbol or instance parameter
+  full_nam   Complete systemd unit name including .service suffix
+
+Notes:
+
+- Services are returned in reverse chronological order (most recently
+  active first)
+
+- The API discovers services from the systemd journal, so it includes
+  both currently running and previously executed services
+
+- Only services with names matching "rpi-sb-", "rpi-naked-", or
+  "rpi-fde-*" patterns are included
+
+- Services with "rpi-provisioner-ui" in the name are excluded from
+  results
+
+/api/v2/service-log/{name}
+
+HTTP Method: GET
+
+Description: Returns log entries for a specific provisioning service
+with support for pagination and ordering. This endpoint provides
+detailed logging information for monitoring service execution.
+
+Path Parameters:
+
+  Parameter   Typ      Require   Description
+  ----------- -------- --------- ---------------------------------------------------------------------------------------------
+  nam         String   Ye        Name of the service to retrieve logs for (must start with rpi-sb-, rpi-naked-, or rpi-fde-)
+
+Query Parameters:
+
+  Parameter   Typ       Require   Default   Description
+  ----------- --------- --------- --------- ---------------------------------------------------------------------
+  pag         Integer   No        1         Page number to retrieve (must be >= 1)
+  page_siz    Integer   No        50        Number of log entries per page (min: 1, max: 500)
+  order       String    No        desc      Order of log entries: "desc" (newest first) or "asc" (oldest first)
+
+Response Format:
+
+The endpoint returns a JSON object with log entries and pagination
+metadata:
+
+    {
+      "logs": [
+        "2025-01-25 14:30:47 Baz",
+        "2025-01-25 14:30:46 Bar",
+        "2025-01-25 14:30:45 Foo"
+      ],
+      "service_name": "rpi-sb-provisioner@10000000abcdef.service",
+      "page": 1,
+      "page_size": 50,
+      "total_entries": 150,
+      "total_pages": 3,
+      "order": "desc"
+    }
+
+Field Descriptions:
+
+  Fiel           Description
+  -------------- -----------------------------------------------------------------
+  log            Array of log entries, each containing timestamp and message
+  service_nam    Name of the service the logs belong to
+  pag            Current page number
+  page_siz       Number of entries per page
+  total_entrie   Total number of log entries available
+  total_page     Total number of pages available
+  order          Current ordering: "desc" (newest first) or "asc" (oldest first)
+
+Example Usage:
+
+To retrieve the first page with default settings (50 newest entries):
+
+    curl http://localhost:3142/api/v2/service-log/rpi-sb-provisioner@10000000abcdef.service
+
+To retrieve page 2 with 100 entries per page, oldest first:
+
+    curl "http://localhost:3142/api/v2/service-log/rpi-sb-provisioner@10000000abcdef.service?page=2&page_size=100&order=asc"
+
+Error Responses:
+
+If accessing an unauthorized service:
+
+    {
+      "error": {
+        "status": 403,
+        "title": "Unauthorized Service",
+        "code": "SERVICE_UNAUTHORIZED",
+        "detail": "Access denied: Only logs for rpi-sb, rpi-naked, and rpi-fde services are available",
+        "additional": "Requested service: invalid-service-name"
+      }
+    }
+
+Notes:
+
+- Default page size is 50 entries, maximum is 500
+
+- Log entries are returned in reverse chronological order (newest first)
+  by default
+
+- Access is restricted to services with approved prefixes for security
+
+- Pagination metadata allows for efficient browsing of large log files
+
+- The page_size parameter is capped at 500 to prevent performance issues
+Guidelines for provisioning large quantities of devices efficiently
+
+This document provides guidance for scaling provisioning operations from
+single devices to high-volume production deployments.
+
+Overview
+
+The provisioning system supports scalable deployment from individual
+devices to high-volume manufacturing operations. This guide covers:
+
+- Connection requirements and infrastructure
+
+- Provisioning strategies and workflow optimization
+
+- Performance characteristics and capacity planning
+
+- Hardware requirements for scaling
+
+- Common issues and solutions
+
+Target audience: Manufacturing engineers, production managers, and
+operations teams planning mass deployment.
+
+Connection Requirements
+
+USB Connection (Mandatory)
+
+USB connectivity is mandatory for all provisioning operations as it
+provides:
+
+- Secure Boot Enablement: USB connection is the only supported method
+  for configuring secure boot on Raspberry Pi devices
+
+- System Bootstrapping: Initial system configuration and image
+  deployment requires USB connectivity
+
+- Security Isolation: Point-to-point USB provides a controlled, isolated
+  communication channel for sensitive provisioning operations
+
+Each provisioning head requires a dedicated USB connection to the target
+Raspberry Pi device.
+
+Ethernet Connection (Optional)
+
+Ethernet connectivity is optional and provides only one benefit:
+
+- Accelerated Image Transfer: Can supplement USB for faster image
+  transfer during provisioning
+
+Note: Ethernet connection does not provide any other provisioning
+benefits beyond accelerated image transfer.
+
+Network Requirements for Ethernet
+
+When utilizing Ethernet connectivity:
+
+- DHCPv4/v6 Support: Network must provide automatic DHCPv4/v6 address
+  assignment
+
+- Routing: Network must be routable to the machine running
+  rpi-sb-provisioner
+
+- Firewall: Ensure provisioning service ports are accessible (refer to
+  API endpoints documentation)
+
+- Bandwidth: Sufficient bandwidth to support concurrent image transfers
+  during provisioning
+
+Provisioning Strategies
+
+Pipelined Provisioning (Recommended)
+
+Pipelined provisioning is the most efficient approach for mass
+operations:
+
+- Continuous Flow: Devices move through provisioning stages in sequence
+
+- Parallel Processing: Multiple devices at different provisioning stages
+  simultaneously
+
+- Resource Optimization: Maximizes utilization of provisioning
+  infrastructure
+
+- Reduced Idle Time: Minimizes operator and equipment downtime
+
+Practical Pipeline Operation
+
+Pipelined provisioning connects devices in sequence while earlier
+devices complete provisioning automatically. Device preparation time
+(unboxing, alignment, cable connection) typically matches or exceeds
+individual device provisioning time, enabling efficient workflow.
+
+Example Pipeline (2.5-minute provisioning time per device):
+
++-----------------+-----------------------------------------------------+
+| Time            | Operator Action                                     |
++=================+=====================================================+
+| 0:00            | Connect Device 1 (provisioning starts               |
+|                 | automatically)                                      |
++-----------------+-----------------------------------------------------+
+| 0:30            | Connect Device 2 (Device 1 continues in background) |
++-----------------+-----------------------------------------------------+
+| 1:00            | Connect Device 3 (Devices 1 & 2 continue)           |
++-----------------+-----------------------------------------------------+
+| 1:30            | Connect Device 4 (Devices 1–3 continue)             |
++-----------------+-----------------------------------------------------+
+| 2:00            | Connect Device 5 (Devices 1–4 continue)             |
++=================+=====================================================+
+| 2:30            | Remove Device 1 (complete), Connect Device 6        |
++=================+=====================================================+
+
+Once the pipeline is established, operators maintain steady workflow
+without waiting for individual device completion. The provisioning
+duration becomes the throughput bottleneck rather than operator
+availability.
+
+Batch Provisioning (Less Efficient)
+
+Batch provisioning processes groups of devices simultaneously:
+
+- Synchronous Processing: All devices in batch must complete before next
+  batch begins
+
+- Resource Contention: Higher peak resource usage during active phases
+
+- Idle Periods: Significant downtime between batches
+
+- Scaling Limitations: More difficult to scale beyond initial batch size
+
+Performance Characteristics
+
+Measured Capacity
+
+Testing with a 2.6GB system image:
+
++-----------------------+-----------------------------------------------+
+| Metric                | Value                                         |
++=======================+===============================================+
+| Provisioning time     | Approximately 2.5 minutes per device          |
++-----------------------+-----------------------------------------------+
+| Operator capacity     | Up to 7 provisioning heads per operator       |
++-----------------------+-----------------------------------------------+
+| Throughput (single    | ~150 devices per 8-hour shift (with pipeline) |
+| operator)             |                                               |
++=======================+===============================================+
+| Throughput (batch     | ~90 devices per 8-hour shift (less efficient) |
+| mode)                 |                                               |
++=======================+===============================================+
+
+Performance Variables
+
+Performance varies based on:
+
+- Image size: Provisioning time increases proportionally with image size
+
+- Security mode: secure-boot and fde-only modes take longer than naked
+  mode due to encryption operations
+
+- Storage type: NVMe is generally faster than eMMC or SD card
+
+- Network connectivity: Ethernet accelerates image transfer but not
+  storage write operations
+
+- Device preparation: Physical handling time affects pipeline efficiency
+
+Throughput Optimization
+
+To maximize provisioning throughput:
+
+1.  Optimize Image Size: Minimize system image size while maintaining
+    required functionality
+
+2.  Parallel Operations: Utilize multiple provisioning heads per
+    operator
+
+3.  Storage Performance: Use high-speed storage (NVMe SSD) for image
+    hosting
+
+4.  Network Optimization: Configure low-latency, high-bandwidth network
+    infrastructure
+
+5.  Process Standardization: Develop standardized operator procedures
+    and workflows
+
+Infrastructure Considerations
+
+Hardware Requirements
+
+Provisioning Server
+
+- Platform: Raspberry Pi hardware (required - system does not run on x86
+  or other architectures)
+
+- Recommended model: Raspberry Pi 5 with maximum available RAM
+
+- Storage: NVMe SSD for image hosting (significantly faster than SD
+  card)
+
+- Power supply: Official Raspberry Pi 27W USB C power supply
+
+- Operating system: Raspberry Pi OS Bookworm or later
+
+Infrastructure
+
+- Network: Gigabit Ethernet minimum for multi-device operations
+
+- Switching: Sufficient port capacity for all devices plus provisioning
+  server
+
+- USB hubs: Official Raspberry Pi powered USB hubs (recommended for
+  reliability)
+
+- Power distribution: Adequate capacity for all connected devices
+
+- Workspace: Organized layout with proper cable management and labeling
+
+USB Scaling Solutions
+
+For scaling USB connectivity in mass provisioning operations, the
+official Raspberry Pi powered USB hub is the recommended solution:
+
+- Validated Hardware: Officially tested and certified for Raspberry Pi
+  device connectivity
+
+- Reliable Power Delivery: Provides consistent power to multiple
+  connected devices
+
+- Proven Performance: Designed to handle the specific power and data
+  requirements of Raspberry Pi provisioning
+
+- Simplified Deployment: Reduces complexity compared to generic USB hub
+  solutions
+
+- Support and Warranty: Backed by official Raspberry Pi support channels
+
+When expanding provisioning capacity, use multiple official Raspberry Pi
+powered USB hubs rather than daisy-chaining or using untested hub
+solutions to ensure reliable operation and minimize connectivity issues.
+
+Quality Assurance
+
+- Verification Procedures: Automated testing of provisioned devices
+
+- Error Handling: Robust error detection and recovery procedures
+
+- Audit Trail: Complete logging of all provisioning operations
+
+- Batch Tracking: Device serial number and configuration tracking
+
+Troubleshooting Common Scaling Issues
+
+Performance Bottlenecks
+
+- USB Bandwidth Saturation: Connect both USB and Ethernet to target
+  devices and allow Ethernet to perform accelerated image transfer while
+  USB handles secure boot configuration. Note that Ethernet only
+  accelerates image transfer time, not the time required to write data
+  to storage
+
+- Network Congestion: Implement QoS policies or network segmentation
+
+- Storage I/O Limits: Upgrade to faster storage subsystem. Consider
+  using NVMe SSD for image hosting
+
+- Memory Constraints: Consider using a Raspberry Pi device with the
+  largest amount of RAM available
+
+Operational Challenges
+
+- Device Detection Issues: Check USB connections and power delivery
+
+- Network Connectivity Problems: Verify DHCP and routing configuration
+
+- Image Corruption: Verify image integrity using checksums -
+  rpi-sb-provisioner includes a webUI that records the supplied image
+  checksum for verification
+
+- Process Synchronization: Establish clear operator procedures and
+  checkpoints
+
+Security Considerations
+
+- Network Isolation: Use dedicated provisioning networks when possible
+
+- Access Controls: Implement appropriate authentication and
+  authorization
+
+- Audit Logging: Maintain comprehensive logs of all provisioning
+  activities
+
+- Physical Security: Ensure secure physical access to provisioning
+  infrastructure
+
+- Key Management: Secure handling of cryptographic keys and certificates
+
+Monitoring and Metrics
+
+Track key performance indicators:
+
+- Provisioning Rate: Devices provisioned per hour/day
+
+- Error Rate: Failed provisioning attempts and root causes
+
+- Resource Utilization: CPU, memory, network, and storage usage
+
+- Operator Efficiency: Time per device and process bottlenecks
+
+- Quality Metrics: Post-provisioning verification success rates
+
+Planning Your Deployment
+
+Small-Scale Operations (1–50 devices)
+
+- Single provisioning head with manual workflow
+
+- Direct USB connection, Ethernet optional
+
+- Standard workspace with basic cable management
+
+- Estimated setup time: 1–2 hours
+
+- No special infrastructure required
+
+Medium-Scale Operations (50–500 devices)
+
+- Multiple provisioning heads (3–7 recommended)
+
+- Pipelined provisioning workflow
+
+- Powered USB hub for multi-device support
+
+- Gigabit Ethernet recommended
+
+- Dedicated workspace with organized layout
+
+- Estimated setup time: 1 day
+
+- Consider manufacturing database for tracking
+
+Large-Scale Operations (500+ devices)
+
+- Multiple provisioning servers with load distribution
+
+- Fully pipelined operations with dedicated operators
+
+- Network infrastructure with QoS policies
+
+- Automated quality assurance integration
+
+- Manufacturing execution system (MES) integration via API
+
+- Comprehensive audit and compliance tracking
+
+- Estimated setup time: 1–2 weeks
+
+- Requires detailed process documentation
+
+Key Success Factors
+
+- Process standardization: Document and train operators on consistent
+  procedures
+
+- Quality control: Implement verification steps at critical points
+
+- Monitoring: Track throughput, error rates, and resource utilization
+
+- Continuous improvement: Analyze bottlenecks and optimize workflow
+
+- Infrastructure investment: Quality equipment reduces downtime and
+  improves reliability
+
+Summary
+
+Efficient mass provisioning requires:
+
+- Connection strategy: USB required, Ethernet optional for acceleration
+
+- Workflow optimization: Pipelined provisioning maximizes throughput
+
+- Infrastructure planning: Quality hardware and organized workspace
+
+- Process discipline: Standardized procedures and quality controls
+
+- Monitoring: Track performance and continuously improve
+
+For implementation details:
+
+- Configuration options: See Configuration Reference
+
+- API integration: See API Documentation
+
+- Device-specific procedures: See Device Guidance
+Example of generated Debian package structure and metadata
+
+Note
+
+The examples below use "Your Organization <ops@example.com>" as the
+maintainer. Configure your actual organization details in
+/etc/rpi-sb-provisioner/bootimg-package-config.
+
+Package Metadata
+
+Control File
+
+The maintainer field is configurable via
+/etc/rpi-sb-provisioner/bootimg-package-config.
+
+    Package: rpi-sb-boot-update
+    Version: a3f5e8c9b2d1
+    Section: admin
+    Priority: optional
+    Architecture: all
+    Maintainer: Your Organization <ops@example.com>
+    Description: Raspberry Pi Secure Boot Update
+     This package contains a signed boot.img and boot.sig for secure boot
+     enabled Raspberry Pi devices.
+     .
+     Source image: 2024-10-06-raspios-bookworm-arm64.img
+     Image SHA256: a3f5e8c9b2d1f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+     .
+     This package will overwrite existing boot.img and boot.sig files in
+     /boot/firmware to apply configuration changes or kernel updates while
+     preserving the existing root filesystem.
+
+Changelog
+
+    rpi-sb-boot-update (a3f5e8c9b2d1) stable; urgency=medium
+
+      * Secure boot image update generated from: 2024-10-06-raspios-bookworm-arm64.img
+      * Source image SHA256: a3f5e8c9b2d1f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+      * Generated on: Mon, 06 Oct 2025 22:30:15 +0000
+      * Device family: Pi 4
+
+     -- Your Organization <ops@example.com>  Mon, 06 Oct 2025 22:30:15 +0000
+
+Package Contents
+
+    rpi-sb-boot-update_a3f5e8c9b2d1_all.deb
+    ├── boot/
+    │   └── firmware/
+    │       ├── boot.img       # Signed boot image (FAT32 filesystem containing
+    │       │                  # kernel, initramfs, config.txt, and other boot files)
+    │       └── boot.sig       # RSA signature
+    ├── usr/
+    │   └── share/
+    │       └── doc/
+    │           └── rpi-sb-boot-update/
+    │               ├── changelog.Debian.gz
+    │               └── copyright
+    └── DEBIAN/
+        ├── control
+        └── postinst
+
+Note: config.txt is embedded inside the boot.img filesystem image. The
+bootloader mounts boot.img and reads configuration from the config.txt
+contained within it.
+
+Installation Example
+
+Installing the Package
+
+    $ sudo dpkg -i rpi-sb-boot-update_a3f5e8c9b2d1_all.deb
+    Selecting previously unselected package rpi-sb-boot-update.
+    (Reading database ... 123456 files and directories currently installed.)
+    Preparing to unpack rpi-sb-boot-update_a3f5e8c9b2d1_all.deb ...
+    Unpacking rpi-sb-boot-update (a3f5e8c9b2d1) ...
+    Setting up rpi-sb-boot-update (a3f5e8c9b2d1) ...
+    Secure boot files installed to /boot/firmware
+    Reboot required for changes to take effect
+
+Verifying Installation
+
+    $ dpkg -l rpi-sb-boot-update
+    Desired=Unknown/Install/Remove/Purge/Hold
+    | Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+    |/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+    ||/ Name                Version         Architecture Description
+    +++-===================-===============-============-==================================
+    ii  rpi-sb-boot-update  a3f5e8c9b2d1    all          Raspberry Pi Secure Boot Update
+
+    $ dpkg -L rpi-sb-boot-update
+    /.
+    /boot
+    /boot/firmware
+    /boot/firmware/boot.img
+    /boot/firmware/boot.sig
+    /usr
+    /usr/share
+    /usr/share/doc
+    /usr/share/doc/rpi-sb-boot-update
+    /usr/share/doc/rpi-sb-boot-update/changelog.Debian.gz
+    /usr/share/doc/rpi-sb-boot-update/copyright
+
+Viewing Package Information
+
+    $ dpkg -s rpi-sb-boot-update
+    Package: rpi-sb-boot-update
+    Status: install ok installed
+    Priority: optional
+    Section: admin
+    Installed-Size: 245678
+    Maintainer: Your Organization <ops@example.com>
+    Architecture: all
+    Version: a3f5e8c9b2d1
+    Description: Raspberry Pi Secure Boot Update
+     This package contains a signed boot.img and boot.sig for secure boot
+     enabled Raspberry Pi devices.
+     .
+     Source image: 2024-10-06-raspios-bookworm-arm64.img
+     Image SHA256: a3f5e8c9b2d1f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+     .
+     This package will overwrite existing boot.img and boot.sig files in
+     /boot/firmware to apply configuration changes or kernel updates while
+     preserving the existing root filesystem.
+
+    $ zcat /usr/share/doc/rpi-sb-boot-update/changelog.Debian.gz
+    rpi-sb-boot-update (a3f5e8c9b2d1) stable; urgency=medium
+
+      * Secure boot image update generated from: 2024-10-06-raspios-bookworm-arm64.img
+      * Source image SHA256: a3f5e8c9b2d1f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+      * Generated on: Mon, 06 Oct 2025 22:30:15 +0000
+      * Device family: Pi 4
+
+     -- Your Organization <ops@example.com>  Mon, 06 Oct 2025 22:30:15 +0000
+
+Note: The maintainer information is configured in
+/etc/rpi-sb-provisioner/bootimg-package-config.
+
+Upgrading Example
+
+When a new version is uploaded:
+
+    $ sudo dpkg -i rpi-sb-boot-update_b7c2a1f5e3d8_all.deb
+    (Reading database ... 123456 files and directories currently installed.)
+    Preparing to unpack rpi-sb-boot-update_b7c2a1f5e3d8_all.deb ...
+    Unpacking rpi-sb-boot-update (b7c2a1f5e3d8) over (a3f5e8c9b2d1) ...
+    Setting up rpi-sb-boot-update (b7c2a1f5e3d8) ...
+    Secure boot files installed to /boot/firmware
+    Reboot required for changes to take effect
+
+    $ dpkg -l rpi-sb-boot-update
+    ii  rpi-sb-boot-update  b7c2a1f5e3d8    all          Raspberry Pi Secure Boot Update
+
+Package Info File Example
+
+The generated package info file (*.package-info.txt) contains:
+
+    Debian Package Information
+    ==========================
+
+    Package: rpi-sb-boot-update
+    Version: a3f5e8c9b2d1
+    Architecture: all
+    Filename: rpi-sb-boot-update_a3f5e8c9b2d1_all.deb
+
+    Source Image: 2024-10-06-raspios-bookworm-arm64.img
+    Image SHA256: a3f5e8c9b2d1f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+
+    Installation:
+      sudo dpkg -i rpi-sb-boot-update_a3f5e8c9b2d1_all.deb
+
+    Removal:
+      sudo dpkg -r rpi-sb-boot-update
+
+    Contents:
+      /boot/firmware/boot.img (contains config.txt, kernel, initramfs, etc.)
+      /boot/firmware/boot.sig (RSA signature)
+
+    Note: A reboot is required after installation for changes to take effect.
+          The config.txt is embedded inside boot.img and will be used after reboot.
+
+Integration with APT
+
+Repository Structure
+
+    /var/www/html/apt/
+    ├── dists/
+    │   └── stable/
+    │       ├── Release
+    │       └── main/
+    │           └── binary-all/
+    │               └── Packages.gz
+    └── pool/
+        └── main/
+            ├── rpi-sb-boot-update_a3f5e8c9b2d1_all.deb
+            ├── rpi-sb-boot-update_b7c2a1f5e3d8_all.deb
+            └── rpi-sb-boot-update_c8d3b2e6f4a9_all.deb
+
+Using APT
+
+    $ sudo apt update
+    Hit:1 http://your-server/apt stable InRelease
+    Reading package lists... Done
+
+    $ apt policy rpi-sb-boot-update
+    rpi-sb-boot-update:
+      Installed: a3f5e8c9b2d1
+      Candidate: c8d3b2e6f4a9
+      Version table:
+         c8d3b2e6f4a9 500
+            500 http://your-server/apt stable/main all Packages
+         b7c2a1f5e3d8 500
+            500 http://your-server/apt stable/main all Packages
+     *** a3f5e8c9b2d1 100
+            100 /var/lib/dpkg/status
+
+    $ sudo apt upgrade rpi-sb-boot-update
+    Reading package lists... Done
+    Building dependency tree... Done
+    The following packages will be upgraded:
+      rpi-sb-boot-update
+    1 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+    Need to get 123 MB of archives.
+    After this operation, 0 B of additional disk space will be used.
+    Do you want to continue? [Y/n] y
+    Get:1 http://your-server/apt stable/main all rpi-sb-boot-update all c8d3b2e6f4a9 [123 MB]
+    Fetched 123 MB in 5s (24.6 MB/s)
+    (Reading database ... 123456 files and directories currently installed.)
+    Preparing to unpack .../rpi-sb-boot-update_c8d3b2e6f4a9_all.deb ...
+    Unpacking rpi-sb-boot-update (c8d3b2e6f4a9) over (a3f5e8c9b2d1) ...
+    Setting up rpi-sb-boot-update (c8d3b2e6f4a9) ...
+    Secure boot files installed to /boot/firmware
+    Reboot required for changes to take effect
+
+Notes
+
+- Package versions are deterministic - the same source image always
+  produces the same package version
+
+- The version can be used to trace back to the exact source image via
+  SHA256
+
+- Changelog provides human-readable information about the source image
+
+- All metadata is embedded in the package for traceability
+
+- config.txt is embedded inside the boot.img filesystem image, not
+  installed as a separate file
+
+- The bootloader mounts boot.img and reads all boot files (including
+  config.txt) from within it
+
+- This is the standard Raspberry Pi secure boot architecture - boot.img
+  contains the entire pre-boot environment
+Automatic generation of boot.img and boot.sig when system images are
+uploaded
+
+Overview
+
+When a new system image is uploaded to the provisioner, and secure-boot
+mode is configured with appropriate key material, the system
+automatically generates a signed boot.img file that can be used to
+update devices in the field without re-provisioning.
+
+This feature addresses the use case described in Issue, where users need
+to modify configuration files (like config.txt) on already-provisioned
+devices.
+
+How It Works
+
+Workflow
+
+1.  Image Upload: User uploads a new system image via the web interface
+
+2.  Automatic Trigger: The provisioner service detects the upload
+
+3.  Configuration Check: System verifies:
+
+    - PROVISIONING_STYLE is set to secure-boot
+
+    - Customer key material is available (CUSTOMER_KEY_FILE_PEM or
+      CUSTOMER_KEY_PKCS11_NAME)
+
+    - RPI_DEVICE_FAMILY is configured
+
+4.  Boot Image Generation: If checks pass, the system:
+
+    - Extracts the boot partition from the uploaded image
+
+    - Inserts the pre-boot authentication initramfs
+
+    - Modifies cmdline.txt and config.txt for secure boot
+
+    - Creates boot.img using rpi-make-boot-image
+
+    - Signs boot.img with the customer key to create boot.sig
+
+5.  Output: Generated files are placed in
+    /srv/rpi-sb-provisioner/images/bootimg-output/
+
+Generated Files
+
+For each uploaded image (e.g., 2024-10-06-raspios-bookworm-arm64.img),
+the following files are created:
+
+- <image-basename>.boot.img - The signed boot image
+
+- <image-basename>.boot.sig - The RSA signature for the boot image
+
+- <image-basename>.config.txt - The fastboot configuration file
+
+- rpi-sb-boot-update_<version>_all.deb - Debian package containing boot
+  files
+
+- <image-basename>.package-info.txt - Package information and
+  installation instructions
+
+The Debian package version is derived from the first 12 characters of
+the source image’s SHA256 hash, ensuring each package has a unique,
+traceable version.
+
+Example: ---- /srv/rpi-sb-provisioner/images/bootimg-output/ ├──
+2024-10-06-raspios-bookworm-arm64.boot.img ├──
+2024-10-06-raspios-bookworm-arm64.boot.sig ├──
+2024-10-06-raspios-bookworm-arm64.config.txt ├──
+rpi-sb-boot-update_a3f5e8c9b2d1_all.deb └──
+2024-10-06-raspios-bookworm-arm64.package-info.txt ----
+
+Using Generated Boot Images
+
+Method 1: Debian Package Installation (Recommended)
+
+The easiest way to update provisioned devices is using the generated
+Debian package:
+
+    # On the provisioned device
+    sudo dpkg -i rpi-sb-boot-update_a3f5e8c9b2d1_all.deb
+    sudo reboot
+
+The package will:
+
+- Install boot.img and boot.sig to /boot/firmware/
+
+- Overwrite existing boot files
+
+- Display a message indicating a reboot is required
+
+Note: config.txt is embedded inside boot.img and does not need to be
+installed separately. The bootloader mounts boot.img as a filesystem and
+reads config.txt from within it.
+
+Advantages of using the Debian package:
+
+- Standard package management integration
+
+- Version tracking with dpkg -l rpi-sb-boot-update
+
+- Clean removal with dpkg -r rpi-sb-boot-update
+
+- Automatic handling of file permissions
+
+- Traceable versions (SHA256-based version numbers)
+
+Method 2: Manual File Replacement
+
+If you need to manually update files on a device:
+
+1.  Modify your base OS image with the desired changes
+
+2.  Upload the modified image to the provisioner
+
+3.  Retrieve the generated boot.img and boot.sig from the output
+    directory
+
+4.  Copy to the device:
+
+        # On the provisioner
+        scp /srv/rpi-sb-provisioner/images/bootimg-output/*.boot.img device:/tmp/
+        scp /srv/rpi-sb-provisioner/images/bootimg-output/*.boot.sig device:/tmp/
+
+        # On the device
+        sudo cp /tmp/*.boot.img /boot/firmware/boot.img
+        sudo cp /tmp/*.boot.sig /boot/firmware/boot.sig
+        sudo sync
+        sudo reboot
+
+Updating Config on Provisioned Devices
+
+If you need to update config.txt on devices already provisioned with
+secure boot:
+
+1.  Modify your base OS image with the desired config.txt changes
+
+2.  Upload the modified image to the provisioner
+
+3.  Deploy the generated Debian package to your devices
+
+4.  Reboot the devices
+
+Important: This approach updates only the boot configuration and kernel.
+The rootfs remains unchanged, preserving any device-specific
+configuration.
+
+Deployment at Scale
+
+For deploying updates to many devices, consider setting up an APT
+repository:
+
+Creating a Simple APT Repository
+
+    # On your update server
+    mkdir -p /var/www/html/apt/pool/main
+    mkdir -p /var/www/html/apt/dists/stable/main/binary-all
+
+    # Copy the generated package
+    cp rpi-sb-boot-update_*.deb /var/www/html/apt/pool/main/
+
+    # Generate Packages file
+    cd /var/www/html/apt
+    dpkg-scanpackages pool/ /dev/null | gzip -9c > dists/stable/main/binary-all/Packages.gz
+
+    # Create Release file
+    cat > dists/stable/Release << EOF
+    Origin: RPI-SB-Provisioner
+    Label: Secure Boot Updates
+    Suite: stable
+    Codename: stable
+    Architectures: all
+    Components: main
+    Description: Raspberry Pi Secure Boot Updates
+    EOF
+
+Configuring Devices to Use the Repository
+
+On each provisioned device:
+
+    # Add repository
+    echo "deb [trusted=yes] http://your-server/apt stable main" | \
+      sudo tee /etc/apt/sources.list.d/rpi-sb-updates.list
+
+    # Update and install
+    sudo apt update
+    sudo apt install rpi-sb-boot-update
+    sudo reboot
+
+Note: The [trusted=yes] flag is used because the packages are not signed
+with a GPG key. For production deployments, consider signing your
+repository with GPG.
+
+Package Versioning and Updates
+
+Since package versions are based on the source image SHA256:
+
+- Each unique source image produces a unique package version
+
+- dpkg/apt will treat packages with different versions as updates
+
+- You can have multiple versions in your repository
+
+- Devices can be pinned to specific versions if needed
+
+Example version progression: ----
+rpi-sb-boot-update_a3f5e8c9b2d1_all.deb # Initial version
+rpi-sb-boot-update_b7c2a1f5e3d8_all.deb # After config.txt change
+rpi-sb-boot-update_c8d3b2e6f4a9_all.deb # After kernel update ----
+
+Security Considerations
+
+- The generated boot images are signed with your customer key
+
+- Only devices provisioned with the matching public key can use these
+  boot images
+
+- The signing key must be the same one used during initial provisioning
+
+- Generated files and packages should be handled as sensitive material
+
+- Debian packages contain the source image filename and SHA256 in the
+  changelog for traceability
+
+- Consider using HTTPS and GPG signing for production APT repositories
+
+Configuration Requirements
+
+Required Settings
+
+In /etc/rpi-sb-provisioner/config:
+
+    # Must be set to secure-boot
+    PROVISIONING_STYLE=secure-boot
+
+    # Device family (4 for Pi 4/CM4, 5 for Pi 5/CM5)
+    RPI_DEVICE_FAMILY=4
+
+    # Key material (choose one)
+    CUSTOMER_KEY_FILE_PEM=/path/to/customer-key.pem
+    # OR
+    CUSTOMER_KEY_PKCS11_NAME='pkcs11:object=<keypair-alias>;type=private'
+
+Package Metadata Configuration
+
+In /etc/rpi-sb-provisioner/bootimg-package-config:
+
+    # Maintainer name for generated Debian packages
+    RPI_SB_PACKAGE_MAINTAINER_NAME="Your Organization"
+
+    # Maintainer email for generated Debian packages
+    RPI_SB_PACKAGE_MAINTAINER_EMAIL="ops@example.com"
+
+Defaults if not configured:
+
+- Name: System Administrator
+
+- Email: root@<hostname> (uses the provisioner server’s hostname)
+
+This separate configuration file allows you to customize the package
+metadata without modifying the main provisioner configuration.
+
+Optional Settings
+
+If these are not set, the boot image generation will be skipped:
+
+- If PROVISIONING_STYLE is not secure-boot, generation is skipped
+
+- If no key material is configured, generation is skipped
+
+- If RPI_DEVICE_FAMILY is not set, generation is skipped
+
+Monitoring and Logs
+
+Service Status
+
+Check the status of boot image generation for a specific image:
+
+    systemctl status rpi-sb-image-bootimg-generator@<image-filename>.service
+
+Logs
+
+Logs are written to:
+
+- Journal: journalctl -u
+  rpi-sb-image-bootimg-generator@<image-filename>.service
+
+- File:
+  /var/log/rpi-sb-provisioner/bootimg-generator/bootimg-generator.log
+
+Log Inspection
+
+    # View recent boot image generation activity
+    tail -f /var/log/rpi-sb-provisioner/bootimg-generator/bootimg-generator.log
+
+    # View service status for all boot image generation jobs
+    systemctl list-units 'rpi-sb-image-bootimg-generator@*'
+
+Implementation Details
+
+Components
+
++-----------------------------------------+-----------------------------------------------------+
+| Component                               | Purpose                                             |
++=========================================+=====================================================+
+| rpi-sb-image-bootimg-generator.sh       | POSIX shell script that extracts boot partition and |
+|                                         | generates signed boot.img                           |
++-----------------------------------------+-----------------------------------------------------+
+| rpi-sb-image-bootimg-generator@.service | systemd template service that runs the generation   |
+|                                         | script                                              |
++=========================================+=====================================================+
+| images.cpp::triggerBootImgGeneration()  | C++ function in web service that triggers the       |
+|                                         | systemd service via D-Bus on upload                 |
++=========================================+=====================================================+
+
+Process Flow
+
+1.  Web service detects image upload (via multipart form upload)
+
+2.  File is saved to /srv/rpi-sb-provisioner/images/
+
+3.  triggerBootImgGeneration() is called with the filename
+
+4.  Function makes a D-Bus call to systemd’s Manager interface using
+    sd_bus_call_method() to start the service
+
+5.  systemd starts the service, which runs the shell script
+
+6.  Shell script:
+
+    - Reads configuration from /etc/rpi-sb-provisioner/config
+
+    - Validates prerequisites (secure-boot mode, key material, device
+      family)
+
+    - Mounts the image using loop device
+
+    - Extracts and modifies boot partition
+
+    - Creates and signs boot.img
+
+    - Places output files in
+      /srv/rpi-sb-provisioner/images/bootimg-output/
+
+Troubleshooting
+
+Boot Image Not Generated
+
+Check configuration:
+
+    grep -E '(PROVISIONING_STYLE|RPI_DEVICE_FAMILY|CUSTOMER_KEY)' /etc/rpi-sb-provisioner/config
+
+Check service status:
+
+    systemctl status rpi-sb-image-bootimg-generator@<image-filename>.service
+
+Check logs:
+
+    journalctl -u rpi-sb-image-bootimg-generator@<image-filename>.service -n 100
+
+Common Issues
+
+Issue: Service starts but immediately exits
+
+Cause
+
+    Configuration is not set to secure-boot, or key material is missing
+
+Solution
+
+    Verify configuration settings in /etc/rpi-sb-provisioner/config
+
+Issue: "Boot partition not found" error
+
+Cause
+
+    Uploaded file is not a valid Raspberry Pi OS image
+
+Solution
+
+    Ensure the uploaded image is a standard Raspberry Pi OS image with a
+    FAT32 boot partition
+
+Issue: "Key file does not exist" error
+
+Cause
+
+    CUSTOMER_KEY_FILE_PEM points to a non-existent file
+
+Solution
+
+    Verify the key file path and ensure the file is readable
+
+Package Management
+
+Viewing Installed Package Information
+
+    # Check if the package is installed
+    dpkg -l rpi-sb-boot-update
+
+    # View package details including changelog
+    dpkg -s rpi-sb-boot-update
+
+    # View package contents
+    dpkg -L rpi-sb-boot-update
+
+    # View changelog (includes source image filename)
+    zcat /usr/share/doc/rpi-sb-boot-update/changelog.Debian.gz
+
+Package Removal
+
+To revert to a previous boot configuration:
+
+    # Remove the package (leaves config files)
+    sudo dpkg -r rpi-sb-boot-update
+
+    # Purge the package (removes everything)
+    sudo dpkg -P rpi-sb-boot-update
+
+Note: After removal, you’ll need to manually restore the previous
+boot.img and boot.sig files.
+
+Querying Package Version
+
+    # Get installed version
+    dpkg-query -W -f='${Version}\n' rpi-sb-boot-update
+
+    # Check package info file for source image details
+    cat /srv/rpi-sb-provisioner/images/bootimg-output/*.package-info.txt
+
+Future Enhancements
+
+Potential improvements for this feature:
+
+- Web UI integration to display and download generated packages
+
+- Automatic cleanup of old packages
+
+- GPG signing of APT repository
+
+- Support for FDE-only mode (without secure boot signing)
+
+- Notification when package generation completes
+
+- Batch generation for multiple images
+
+- Automatic APT repository generation and hosting
+
+References
+
+- GitHub Issue #191
+
+- System Architecture
+
+- Configuration Variables
+This document describes the configuration variables used in
+/etc/rpi-sb-provisioner/config. You do not typically need to set these
+variables, and they are set by the WebUI. You may manually set them if
+you want to use a change management system or similar to update them.
+
+Variables
+
+PROVISIONING_STYLE
+
+Mandatory, with a default
+
+Select the provisioning style you wish to use. Supported values are
+secure-boot, fde-only and naked. For details on what each provisioning
+style does, see the main documentation.
+
+If PROVISIONING_STYLE is not specified, it defaults to secure-boot.
+
+CUSTOMER_KEY_FILE_PEM
+
+Optional, mandatory if CUSTOMER_KEY_PKCS11_NAME is not set
+
+The fully qualified path to your signing key, encoded in PEM format.
+This file is expected to contain an RSA 2048-bit Private Key.
+
+Warning
+
+This file should be considered key material, and should be protected
+while at rest and in use according to your threat model.
+
+CUSTOMER_KEY_PKCS11_NAME
+
+Optional, mandatory if CUSTOMER_KEY_FILE_PEM is not set
+
+The keypair alias for a PKCS11 keypair, typically stored on a Hardware
+Security Module (HSM) and provided through a helper tool. This is
+expected to act in place of the RSA 2048-bit Private key specified with
+CUSTOMER_KEY_FILE_PEM, and will be used as the signing device for all
+future pre-boot authentication images.
+
+The value should take the format:
+
+    'pkcs11:object=<keypair-alias>;type=private'
+
+Warning
+
+You must use single quotes to enclose the value, and URI encode the
+value
+
+Warning
+
+The PKCS11 provider, and it’s associated HSM, should be considered key
+material and should be protected while at rest and in use according to
+your threat model.
+
+GOLD_MASTER_OS_FILE
+
+Mandatory
+
+This should be your ’gold master’ OS image. No customisation should be
+present in this image that you would not expect to be deployed to your
+entire fleet. rpi-sb-provisioner assumes this image has been created
+using pi-gen, and using a non-pi-gen image may produce undefined
+behaviour.
+
+Warning
+
+This file must be the uncompressed image.
+
+RPI_DEVICE_STORAGE_TYPE
+
+Mandatory
+
+Specify the kind of storage your target will use. Supported values are
+sd, emmc, nvme.
+
+RPI_DEVICE_STORAGE_CIPHER
+
+Optional
+
+Specify the full-disk-encryption cipher. Supported values are
+aes-xts-plain64, xchacha12,aes-adiantum-plain64.
+
+If RPI_DEVICE_STORAGE_CIPHER is not specified, it defaults to
+aes-xts-plain64.
+
+aes-xts-plain64 is recommended for Raspberry Pi 5 family devices
+(including Compute Module 5); all other Raspberry Pi devices are
+recommended to use xchacha12,aes-adiantum-plain64 for improved
+performance.
+
+RPI_DEVICE_FAMILY
+
+Mandatory
+
+Specify the family of Raspberry Pi device you are provisioning.
+Supported values are 4, 5, 2W. For example:
+
+- A Raspberry Pi Compute Module 4 would be family 4
+
+- A Raspberry Pi 5 would be family 5
+
+- A Raspberry Pi Compute Module 5 would be family 5
+
+- A Raspberry Pi Zero 2 W would be family 2W
+
+RPI_DEVICE_BOOTLOADER_CONFIG_FILE
+
+Mandatory, with a default
+
+Warning
+
+rpi-sb-provisioner will ignore the Raspberry Pi Bootloader configuration
+built by pi-gen, and use the one provided in this variable.
+
+Specify the Raspberry Pi Bootloader configuration you want your
+provisioned devices to use. A default is provided.
+
+Further information on the format of this configuration file can be
+found in the Raspberry Pi Documentation, at
+https://www.raspberrypi.com/documentation/computers/config_txt.html
+
+RPI_DEVICE_FIRMWARE_FILE
+
+Optional
+
+Specify an explicit path to a specific pieeprom firmware file to use
+during provisioning.
+
+When set, the provisioning system will use the exact firmware file
+specified. If not set, the system will automatically select the latest
+firmware from the ’default’ release channel.
+
+Example:
+RPI_DEVICE_FIRMWARE_FILE=/lib/firmware/raspberrypi/bootloader-2712/default/pieeprom-2025-05-08.bin
+
+This setting is typically configured through the firmware selection web
+interface rather than manually.
+
+Warning
+
+Ensure the specified firmware file exists and is compatible with your
+target device family before provisioning.
+
+RPI_DEVICE_LOCK_JTAG
+
+Optional
+
+Raspberry Pi devices have a mechanism to restrict JTAG access to the
+device.
+
+Note that using this function will prevent Raspberry Pi engineers from
+being able to assist in debugging your device, should you request
+assitance.
+
+Set to any value to enable the JTAG restrictions.
+
+RPI_DEVICE_EEPROM_WP_SET
+
+Optional
+
+Raspberry Pi devices that use an EEPROM as part of their boot flow can
+configure that EEPROM to enable write protection - preventing
+modification.
+
+Set to any value to enable EEPROM write protection.
+
+RPI_SB_PROVISIONER_MANUFACTURING_DB
+
+Optional
+
+Store manufacturing data in a sqlite3 database. This will include the
+board serial, board revision, the boot ROM version, the MAC address of
+the ethernet port, any set hash of the customer signing key, the JTAG
+lock state, the board attributes and the advanced boot flags. It will
+also include the OS image filename and its SHA256 used during
+provisioning.
+
+You must not specify the path of a database stored on a network drive or
+similar storage, as this mechanism is only safe to use on a single
+provisioning system. For merging the output with multiple provisioning
+systems, consider Processing the manufacturing database in the main
+documentation.
+
+Set to the path of a file to contain a SQLite database stored on local
+storage. The WebUI will create this file if it does not exist.
+
+Warning
+
+If you are not using the WebUI, you must create this file before
+execution, for example using touch:
+
+    $ touch ${RPI_SB_PROVISIONER_MANUFACTURING_DB}
+
+RPI_DEVICE_RETRIEVE_KEYPAIR
+
+Optional
+
+Specify a directory to copy the device unique keypair to. The keys will
+be named <serial>.der and <serial>.pub
+
+Set to the path of a directory to use, otherwise keys will be stored
+alongside provisioning logs in a directory named "keypair".
+
+Note
+
+These keys are sensitive key material, and you must ensure they are
+handled appropriately.
+
+RPI_SB_PROVISIONER_ENABLE_PRIVATE_KEY_API
+
+Optional - SECURITY CRITICAL
+
+Caution
+
+DANGER: This setting controls a highly dangerous feature that should
+NEVER be enabled in production environments.
+
+Controls whether the HTTP API endpoint /devices/{serialno}/key/private
+is enabled. This endpoint allows downloading device private keys over
+HTTP.
+
+Default: false (endpoint is disabled)
+
+Values:
+
+- Not set or any value except true: Endpoint is disabled (secure
+  default)
+
+- true: Endpoint is enabled (DANGEROUS - private keys can be downloaded
+  via HTTP)
+
+Security Implications:
+
+When enabled, this setting allows device private keys to be retrieved
+via HTTP API calls. This presents severe security risks:
+
+- Private keys provide complete control over device cryptographic
+  identity
+
+- Keys transmitted over HTTP (even on "private" networks) can be
+  intercepted
+
+- Compromised keys allow impersonation and signature forgery
+
+- Keys cannot be revoked once compromised
+
+Only enable this setting if:
+
+- You are in a completely isolated development/test environment
+
+- The provisioning server is air-gapped from production networks
+
+- You have no alternative method to retrieve keys
+
+- You fully understand and accept the security implications
+
+- You can actively monitor audit logs for unauthorized access
+
+Audit Logging:
+
+When this endpoint is enabled and used:
+
+- All access attempts (successful and denied) are logged to the audit
+  database
+
+- Each access generates WARNING level logs
+
+- Successful key downloads are logged as CRITICAL security events
+
+- Logs include client IP address, User-Agent, and serial numbers
+
+Alternatives:
+
+Instead of enabling this endpoint, consider:
+
+- Accessing keys directly from the filesystem:
+  /var/log/rpi-sb-provisioner/{serial}/keypair/
+
+- Using secure file transfer over SSH (scp or sftp)
+
+- Delivering keys via physical media (USB drive)
+
+- Implementing a proper secrets management solution
+
+Example Configuration:
+
+To enable this endpoint (NOT RECOMMENDED):
+
+    # WARNING: Only enable in isolated test environments
+    # This exposes device private keys via HTTP API
+    RPI_SB_PROVISIONER_ENABLE_PRIVATE_KEY_API=true
+
+Warning
+
+Raspberry Pi does not recommend enabling this setting under any
+circumstances in production environments. If you must retrieve keys
+programmatically, carefully consider the security implications.
+
+RPI_SB_WORKDIR
+
+Optional
+
+Warning
+
+If you do not set this variable, your modified OS intermediates will not
+be stored, and will be unavailable for inspection.
+
+Set to a location to cache OS assets between provisioning sessions.
+Recommended for use in production. For example:
+
+    /srv/rpi-sb-provisioner/workdir
+
+Format of the config file
+
+The config file is a simple text file, with one variable per line.
+Variables are specified in the format:
+
+    VARIABLE_NAME=value
+
+For example:
+
+    RPI_SB_PROVISIONER_MANUFACTURING_DB=/var/lib/rpi-sb-provisioner/manufacturing.db
+
+Comments can be added to the file by starting a line with a # character.
+
+    # This is a comment
+    RPI_SB_PROVISIONER_MANUFACTURING_DB=/var/lib/rpi-sb-provisioner/manufacturing.db
+
+Boot Image Package Configuration
+
+The boot image generator creates Debian packages for deploying boot
+updates to provisioned devices. Package metadata is configured in a
+separate file: /etc/rpi-sb-provisioner/bootimg-package-config
+
+RPI_SB_PACKAGE_MAINTAINER_NAME
+
+Optional
+
+The maintainer name to use in generated Debian packages.
+
+Default: System Administrator (if not set)
+
+Example: ---- RPI_SB_PACKAGE_MAINTAINER_NAME="Acme Corporation" ----
+
+This value appears in the Maintainer field of the Debian package control
+file and changelog.
+
+RPI_SB_PACKAGE_MAINTAINER_EMAIL
+
+Optional
+
+The maintainer email address to use in generated Debian packages.
+
+Default: root@<hostname> (uses the provisioner server’s hostname if not
+set)
+
+Example: ---- RPI_SB_PACKAGE_MAINTAINER_EMAIL="ops@acme.com" ----
+
+This value is combined with RPI_SB_PACKAGE_MAINTAINER_NAME to form the
+full maintainer field in Debian packages.
+
+Complete Example Configuration:
+
+File: /etc/rpi-sb-provisioner/bootimg-package-config ---- # Debian
+package metadata for boot image updates
+RPI_SB_PACKAGE_MAINTAINER_NAME="Acme Corporation"
+RPI_SB_PACKAGE_MAINTAINER_EMAIL="ops@acme.com" ----
+
+This will generate packages with: ---- Maintainer: Acme Corporation
+<ops@acme.com> ----
+
+See Boot Image Generator Documentation for more information about the
+automatic boot image generation feature.
+# Load the boot files from the ramdisk which is signed in secure-boot mode
+boot_ramdisk=1
+uart_2ndstage=1
+cmake_minimum_required(VERSION 3.25)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    include(cmake/DebianHardening.cmake)
+    include(cmake/RaspberryPiHardening.cmake)
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(FetchContent)
+
+# Prevent installation of Drogon dependencies by setting BUILD_* options before declaring the dependency
+set(BUILD_EXAMPLES OFF CACHE BOOL "Build Drogon examples" FORCE)
+set(BUILD_CTL ON CACHE BOOL "Build drogon_ctl utility" FORCE)  # Needed for compiling CSP templates
+set(BUILD_ORM OFF CACHE BOOL "Build ORM" FORCE)
+set(BUILD_BROTLI OFF CACHE BOOL "Build brotli support" FORCE)
+set(BUILD_YAML_CONFIG OFF CACHE BOOL "Build yaml config support" FORCE)
+# Set this before making Drogon available to ensure it doesn't get installed
+set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON CACHE BOOL "Skip installation of all dependencies" FORCE)
+
+FetchContent_Declare(drogon
+ GIT_REPOSITORY https://github.com/drogonframework/drogon.git
+ GIT_TAG        v1.9.11
+ EXCLUDE_FROM_ALL  # Prevents installation in packages
+)
+
+# Store original flags
+set(ORIGINAL_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+# Disable format-nonliteral warning only for Drogon, which is a third party library
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=format-nonliteral")
+
+# Check if population has already been performed
+FetchContent_GetProperties(drogon)
+string(TOLOWER "drogon" lcName)
+if(NOT ${lcName}_POPULATED)
+  FetchContent_Populate(drogon)
+  add_subdirectory(${${lcName}_SOURCE_DIR} ${${lcName}_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+# Restore original flags
+set(CMAKE_CXX_FLAGS ${ORIGINAL_CXX_FLAGS})
+
+unset(BUILD_YAML_CONFIG)
+unset(BUILD_BROTLI)
+unset(BUILD_ORM)
+unset(BUILD_CTL)
+unset(BUILD_EXAMPLES)
+
+# Add libcurl with minimal configuration
+set(BUILD_CURL_EXE OFF CACHE BOOL "Set to ON to build curl executable." FORCE)
+set(HTTP_ONLY ON CACHE BOOL "Set to ON to build with HTTP support only." FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "Set to ON to build libcurl tests." FORCE)
+set(ENABLE_MANUAL OFF CACHE BOOL "Set to ON to enable manual." FORCE)
+set(CURL_USE_OPENSSL ON CACHE BOOL "Set to ON to use OpenSSL for HTTPS." FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Set to OFF to build static libraries." FORCE)
+# Disable all protocols except HTTP(S)
+set(CURL_DISABLE_DICT ON CACHE BOOL "Set to ON to disable DICT." FORCE)
+set(CURL_DISABLE_FILE ON CACHE BOOL "Set to ON to disable FILE." FORCE)
+set(CURL_DISABLE_FTP ON CACHE BOOL "Set to ON to disable FTP." FORCE)
+set(CURL_DISABLE_GOPHER ON CACHE BOOL "Set to ON to disable GOPHER." FORCE)
+set(CURL_DISABLE_IMAP ON CACHE BOOL "Set to ON to disable IMAP." FORCE)
+set(CURL_DISABLE_LDAP ON CACHE BOOL "Set to ON to disable LDAP." FORCE)
+set(CURL_DISABLE_LDAPS ON CACHE BOOL "Set to ON to disable LDAPS." FORCE)
+set(CURL_DISABLE_POP3 ON CACHE BOOL "Set to ON to disable POP3." FORCE)
+set(CURL_DISABLE_RTSP ON CACHE BOOL "Set to ON to disable RTSP." FORCE)
+set(CURL_DISABLE_SMB ON CACHE BOOL "Set to ON to disable SMB." FORCE)
+set(CURL_DISABLE_SMTP ON CACHE BOOL "Set to ON to disable SMTP." FORCE)
+set(CURL_DISABLE_TELNET ON CACHE BOOL "Set to ON to disable TELNET." FORCE)
+set(CURL_DISABLE_TFTP ON CACHE BOOL "Set to ON to disable TFTP." FORCE)
+# Disable libidn2 and libpsl
+set(USE_LIBIDN2 OFF CACHE BOOL "Set to OFF to disable libidn2." FORCE)
+set(CURL_USE_LIBPSL OFF CACHE BOOL "Set to OFF to disable libpsl." FORCE)
+# Disable SSH2
+set(CURL_USE_LIBSSH2 OFF CACHE BOOL "Set to OFF to disable libssh2." FORCE)
+# Disable additional features
+set(CURL_DISABLE_ALTSVC ON CACHE BOOL "Set to ON to disable alt-svc support." FORCE)
+set(ENABLE_UNIX_SOCKETS OFF CACHE BOOL "Set to OFF to disable Unix domain sockets." FORCE)
+set(CURL_DISABLE_COOKIES ON CACHE BOOL "Set to ON to disable cookies support." FORCE)
+set(CURL_DISABLE_HSTS ON CACHE BOOL "Set to ON to disable HSTS support." FORCE)
+set(CURL_DISABLE_DOH ON CACHE BOOL "Set to ON to disable DNS-over-HTTPS." FORCE)
+set(CURL_DISABLE_WEBSOCKETS ON CACHE BOOL "Set to ON to disable WebSocket." FORCE)
+set(CURL_DISABLE_PROXY ON CACHE BOOL "Set to ON to disable proxy support." FORCE)
+set(CURL_DISABLE_GETOPTIONS ON CACHE BOOL "Set to ON to disable curl_easy_options API." FORCE)
+set(CURL_DISABLE_HEADERS_API ON CACHE BOOL "Set to ON to disable headers-api support." FORCE)
+set(CURL_DISABLE_SOCKETPAIR ON CACHE BOOL "Set to ON to disable use of socketpair." FORCE)
+# Disable authentication methods (we only need simple HTTPS requests)
+# BUG: Authentication provicers are required to build curl, due to a bug in the curl code
+set(CURL_DISABLE_BASIC_AUTH ON CACHE BOOL "Set to ON to disable Basic authentication." FORCE)
+set(CURL_DISABLE_BEARER_AUTH ON CACHE BOOL "Set to ON to disable Bearer authentication." FORCE)
+set(CURL_DISABLE_DIGEST_AUTH ON CACHE BOOL "Set to ON to disable Digest authentication." FORCE)
+set(CURL_DISABLE_KERBEROS_AUTH ON CACHE BOOL "Set to ON to disable Kerberos authentication." FORCE)
+set(CURL_DISABLE_NEGOTIATE_AUTH ON CACHE BOOL "Set to ON to disable negotiate authentication." FORCE)
+set(CURL_DISABLE_AWS ON CACHE BOOL "Set to ON to disable aws-sigv4." FORCE)
+set(CURL_DISABLE_NTLM ON CACHE BOOL "Set to ON to disable NTLM support." FORCE)
+
+FetchContent_Declare(curl
+ GIT_REPOSITORY https://github.com/curl/curl.git
+ GIT_TAG        curl-8_16_0
+ PATCH_COMMAND patch -p1 < ${CMAKE_SOURCE_DIR}/cmake/curl/http-no-auth.patch
+ UPDATE_DISCONNECTED 1
+ EXCLUDE_FROM_ALL  # Prevents installation in packages
+)
+
+FetchContent_GetProperties(curl)
+string(TOLOWER "curl" curlName)
+if(NOT ${curlName}_POPULATED)
+  FetchContent_Populate(curl)
+  add_subdirectory(${${curlName}_SOURCE_DIR} ${${curlName}_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+# Add jsoncpp with static linking
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+set(BUILD_STATIC_LIBS ON CACHE BOOL "Build static libraries" FORCE)
+set(JSONCPP_WITH_TESTS OFF CACHE BOOL "Compile and run JsonCpp test executables" FORCE)
+set(JSONCPP_WITH_POST_BUILD_UNITTEST OFF CACHE BOOL "Automatically run unit-tests as a post build step" FORCE)
+set(JSONCPP_WITH_PKGCONFIG_SUPPORT OFF CACHE BOOL "Generate and install .pc files" FORCE)
+set(JSONCPP_WITH_CMAKE_PACKAGE OFF CACHE BOOL "Generate and install cmake package files" FORCE)
+
+FetchContent_Declare(jsoncpp
+ GIT_REPOSITORY https://github.com/open-source-parsers/jsoncpp.git
+ GIT_TAG        1.9.6
+ EXCLUDE_FROM_ALL  # Prevents installation in packages
+)
+
+FetchContent_GetProperties(jsoncpp)
+string(TOLOWER "jsoncpp" jsoncppName)
+if(NOT ${jsoncppName}_POPULATED)
+  FetchContent_Populate(jsoncpp)
+  add_subdirectory(${${jsoncppName}_SOURCE_DIR} ${${jsoncppName}_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+# Unset jsoncpp configuration flags
+unset(BUILD_SHARED_LIBS)
+unset(BUILD_STATIC_LIBS)
+unset(JSONCPP_WITH_TESTS)
+unset(JSONCPP_WITH_POST_BUILD_UNITTEST)
+unset(JSONCPP_WITH_PKGCONFIG_SUPPORT)
+unset(JSONCPP_WITH_CMAKE_PACKAGE)
+
+# Unset curl configuration flags
+unset(BUILD_CURL_EXE)
+unset(HTTP_ONLY)
+unset(BUILD_TESTING)
+unset(ENABLE_MANUAL)
+unset(CURL_USE_OPENSSL)
+unset(BUILD_SHARED_LIBS)
+unset(CURL_DISABLE_DICT)
+unset(CURL_DISABLE_FILE)
+unset(CURL_DISABLE_FTP)
+unset(CURL_DISABLE_GOPHER)
+unset(CURL_DISABLE_IMAP)
+unset(CURL_DISABLE_LDAP)
+unset(CURL_DISABLE_LDAPS)
+unset(CURL_DISABLE_POP3)
+unset(CURL_DISABLE_RTSP)
+unset(CURL_DISABLE_SMB)
+unset(CURL_DISABLE_SMTP)
+unset(CURL_DISABLE_TELNET)
+unset(CURL_DISABLE_TFTP)
+unset(USE_LIBIDN2)
+unset(CURL_USE_LIBPSL)
+unset(CURL_USE_LIBSSH2)
+unset(CURL_DISABLE_ALTSVC)
+unset(ENABLE_UNIX_SOCKETS)
+unset(CURL_DISABLE_COOKIES)
+unset(CURL_DISABLE_HSTS)
+unset(CURL_DISABLE_DOH)
+unset(CURL_DISABLE_WEBSOCKETS)
+unset(CURL_DISABLE_PROXY)
+unset(CURL_DISABLE_GETOPTIONS)
+unset(CURL_DISABLE_HEADERS_API)
+unset(CURL_DISABLE_SOCKETPAIR)
+# unset(CURL_DISABLE_BASIC_AUTH)
+# unset(CURL_DISABLE_BEARER_AUTH)
+# unset(CURL_DISABLE_DIGEST_AUTH)
+# unset(CURL_DISABLE_KERBEROS_AUTH)
+# unset(CURL_DISABLE_NEGOTIATE_AUTH)
+# unset(CURL_DISABLE_AWS)
+# unset(CURL_DISABLE_NTLM)
+
+# Download the ZXing library for barcode scanning
+set(ZXING_JS_URL "https://cdn.jsdelivr.net/npm/@zxing/library/umd/index.min.js")
+set(ZXING_JS_PATH "${CMAKE_SOURCE_DIR}/static/js/zxing.js")
+
+# Add a custom command to download the ZXing library at build time
+add_custom_command(
+    OUTPUT ${ZXING_JS_PATH}
+    COMMAND ${CMAKE_COMMAND} -E echo "Downloading ZXing library from ${ZXING_JS_URL}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/static/js"
+    COMMAND curl --silent --show-error --output ${ZXING_JS_PATH} ${ZXING_JS_URL}
+    COMMAND ${CMAKE_COMMAND} -E echo "ZXing library downloaded to ${ZXING_JS_PATH}"
+    COMMENT "Downloading ZXing barcode scanning library"
+    VERBATIM
+)
+
+# Create a custom target for downloading ZXing
+add_custom_target(download_zxing DEPENDS ${ZXING_JS_PATH})
+
+project(rpi-provisioner-ui)
+
+find_package(SQLite3 REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(systemd REQUIRED libsystemd)
+find_package(OpenSSL REQUIRED)
+
+# Define the views directory and output directory for compiled templates
+set(VIEWS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/views)
+set(CSP_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/views_output)
+
+# Create output directory
+file(MAKE_DIRECTORY ${CSP_OUTPUT_DIR})
+
+# Find all .csp files in the views directory
+file(GLOB_RECURSE CSP_FILES ${VIEWS_DIR}/*.csp)
+
+# Process each CSP file individually
+set(VIEW_SOURCES "")
+foreach(cspFile ${CSP_FILES})
+  get_filename_component(cspFileName ${cspFile} NAME_WE)
+  add_custom_command(
+    OUTPUT ${CSP_OUTPUT_DIR}/${cspFileName}.h ${CSP_OUTPUT_DIR}/${cspFileName}.cc
+    COMMAND $<TARGET_FILE:drogon_ctl> create view ${cspFile} -o ${CSP_OUTPUT_DIR}
+    DEPENDS ${cspFile}
+    COMMENT "Compiling CSP template: ${cspFileName}"
+    VERBATIM
+  )
+  list(APPEND VIEW_SOURCES ${CSP_OUTPUT_DIR}/${cspFileName}.cc)
+endforeach()
+
+# Create a custom target for CSP compilation
+add_custom_target(compile_views DEPENDS ${VIEW_SOURCES})
+
+add_executable(rpi-provisioner-ui)
+
+# Add dependency on the compile_views target
+add_dependencies(rpi-provisioner-ui compile_views)
+
+# Add zxing dependency
+add_dependencies(rpi-provisioner-ui download_zxing)
+
+target_sources(rpi-provisioner-ui
+    PRIVATE
+    src/main.cpp
+    src/images.cpp
+    src/options.cpp
+    src/devices.cpp
+    src/customisation.cpp
+    src/services.cpp
+    src/manufacturing.cpp
+    src/scantool.cpp
+    src/audit.cpp
+    src/utils.cpp
+    ${VIEW_SOURCES}
+)
+
+target_include_directories(rpi-provisioner-ui
+    PRIVATE
+    src/include
+    ${SQLite3_INCLUDE_DIR}
+    ${CSP_OUTPUT_DIR}  # Include the compiled templates
+    ${curl_SOURCE_DIR}/include  # Add curl headers
+)
+
+target_link_libraries(rpi-provisioner-ui
+    PRIVATE
+    jsoncpp_static
+    drogon
+    ${systemd_LIBRARIES}
+    ${SQLite3_LIBRARY}
+    libcurl
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)
+
+# Install directives
+# Only install our executable and service file, not any of the FetchContent dependencies
+install(TARGETS rpi-provisioner-ui
+    RUNTIME DESTINATION /usr/bin
+)
+
+# Install static files
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/static/"
+        DESTINATION /usr/share/rpi-sb-provisioner/static
+        FILES_MATCHING PATTERN "*.js"
+        PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)A web service to monitor and configure the rpi-sb-provisioner services.
+
+Features
+
+- Web-based configuration interface
+
+- Device provisioning monitoring
+
+- Manufacturing database viewer
+
+- REST API for manufacturing data access and integration
+
+API Documentation
+
+The provisioner-service provides API endpoints for integration with
+other systems:
+
+- Manufacturing Database API - Access device provisioning data in JSON
+  format with pagination support
+
+  - See API Endpoints Documentation for details

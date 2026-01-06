@@ -1,0 +1,74 @@
+URL: https://www.raspberrypi.com/news/introducing-rpi-image-gen-build-highly-customised-raspberry-pi-software-images
+
+Introducing rpi-image-gen: build highly customised Raspberry Pi software images
+When it comes to software on Raspberry Pi devices, one size doesn’t always fit all. Raspberry Pi OS is ideal for many applications, but we recognise that it doesn’t suit every use case or deployment model, particularly in a product that has a specific purpose. If you’re building an embedded system or an industrial controller, you’ll need complete control over the software resident on the device, and home users may wish to build their own OS and have it pre-configured exactly the way they want. For developers and organisations that require a custom software image, a flexible and transparent build system is essential; to support these customers, we have created rpi-image-gen, a powerful new tool designed to put you in complete control of your Raspberry Pi images.
+rpi-image-gen is an alternative to pi-gen, which is the tool we use to create and deploy the Raspberry Pi OS distribution. rpi-image-gen is designed to generate highly customised software images for Raspberry Pi devices, and offers a very granular level of control over file system construction and software image creation.
+Why we created rpi-image-gen: a purpose-built solution for our customers
+There are a number of community-maintained build systems which already exist and which support Raspberry Pi devices. These offer several customisation options and are used by many Raspberry Pi customers today, so you may be wondering why we decided to create our own. rpi-image-gen was most definitely not born out of a ‘not-invented-here’ mindset; there are valid reasons why our customers would benefit from a tool designed, from scratch, to provide the flexibility we know they need to deploy software on their products.
+By supporting a build system that has the benefits of Raspberry Pi OS distribution packages, we have one set of sources to maintain, which means that when software gets improved or fixed in one place, it’s automatically made available everywhere. Consolidating around centralised package-based delivery of software and updates makes a lot of sense. In addition, being able to help reduce software build time, provide guaranteed ownership of support, and reuse standard methodologies to ensure authenticity of software were all of paramount importance, and among the reasons why we created a new home-grown build tool for Raspberry Pi devices.
+How rpi-image-gen works: a new approach to building images
+Similar to pi-gen, rpi-image-gen leverages the power, reliability, and trust of installing a Debian Linux system for the device. However, unlike pi-gen, rpi-image-gen introduces some new concepts which serve to dictate the build footprint and installation.
+Specifying your image: profiles, image layouts, and config files
+A profile is essentially a collection of descriptive layers which group together Debian packages and installation operations. These collections can be selectively picked and customised further, and form the foundation of the software image. The image layout describes how the output software binary image will be created and laid out on-disk for programming into the device, including the types of file systems, partition table entries, image formats, etc. A config file is a ‘top level’ text file, written in easy-to-understand .ini
+syntax, which defines the profile and image layout that rpi-image-gen uses to build the device image.
+The config file is typically associated with the underlying device hardware and product, so it can specify applicable attributes accordingly: for example, defining the sizes of individual partition images to match the onboard eMMC size, or using a layout which uses particular mount options for file systems, fine tuning options exposed by lower levels, or selecting a specific Raspberry Pi device class to target. Likewise, different derivatives of config files can be used to tailor the installation to the product’s functional requirements. You could, for example, utilise a Bluetooth audio layer to pull in device support; or use a particular layer to add in a minimal Wayland desktop which runs in a kiosk mode, to install a default set of containers, to seed a default environment for distribution to third-party developers, and so on. There is no limit to the possibilities.
+Example builds: custom images in action
+There is a small number of examples in the tree which demonstrate different use cases of rpi-image-gen. All create bootable disk images and serve to illustrate how one might use rpi-image-gen to create a bespoke image for a particular purpose. The number of examples will grow over time and we welcome suggestions for new ones. Let’s pick two of them and take a closer look: slim and webkiosk.
+slim: create a small, lightweight image
+slim is an incredibly simple illustration of how to create a lightweight image containing a small number of essential packages that will boot on your Raspberry Pi. This image alone is not incredibly useful, but it shows how a custom configuration can be created and built upon in order to keep the size of the file system minimal. A small number of layers are pulled in by the profile (e.g. Debian base, core utilities, Linux kernel, and boot firmware), then a Raspberry Pi OS–style disk image is created with some headroom to run apt update
+and install a few packages.
+webkiosk: create an image that boots into a browser kiosk mode
+webkiosk builds upon a profile that, once again, pulls in a minimal number of components. It then adds, via a custom hook, other packages which are needed to support running the Chromium web browser in kiosk mode under Wayland. This image auto-boots into the browser using a custom systemd
+service and runs it full-screen with VT switching disabled. The Wayland compositor used (Cage) is a single-instance compositor, which is ideal for deployments that need to prevent user intervention via keyboard or mouse; for example, users should not be able to switch out of one window and into another via standard keyboard shortcuts.
+What you leave out is just as important as what you include: how to control both
+As well as being able to configure the build and device image the way you want, it’s important to be able to exclude from the package-based installation things that would otherwise be installed as part of the profile. One way to do this is via dpkg
+options, which are supported by the tool underpinning rpi-image-gen. The mmdebstra
+p engine drives device file system creation, with bdebstrap
+above it providing a highly customisable framework and a descriptive textual representation of layers. A layer is written in YAML, which is human-readable and easy to understand. Excluding assets from a package install is as easy as using dpkg --path-exclude
+and/or --path-include
+options in YAML for the particular layer that is pulled in by the profile.
+Security, trust, and compliance: what this means for our customers
+Auditing software, and being able to generate a list of the security vulnerabilities of a deployed device, is critically important. A Software Bill of Materials (SBOM) in a standardised format should be one of the output artefacts of any software build system. rpi-image-gen produces an SBOM for every build and provides output format customisation options to the user, allowing them to feed that into other systems — for example, to generate a list of CVEs. By providing an SBOM and tracking security vulnerabilities, you are helping to give consumers of your image confidence in the software deployed on their device. In the not-too-distant future, there will be legislative requirements in this area, and we believe Raspberry Pi is well placed in the industry to provide customers with what they need.
+One advantage of creating anything from scratch is the ability to make it exactly the way you want — to own it and shape it over time. We like to think that we understand the needs of our customers well, and we try to put them at the forefront of a significant part of our software development effort. It’s important that customers can trust us to help them resolve their problems, and can rely on our support for their product deployment. We’re proud to offer them a Raspberry Pi-supported build system which generates auditable software for their products in a way that is flexible and efficient for their engineering teams to use.
+Visit the rpi-image-gen GitHub repository to get started. There, you’ll find documentation and examples to guide you through creating custom Raspberry Pi images. We encourage you to explore the repository and provide feedback to help us improve the tool further.
+16 comments
+Ray Franco
+I never invisioned this. I am currently working on a project using the Zero 2W, which has only 512 MB of RAM. I hope I can get some it back from the OS. I can not wait to get started.
+MCJ
+This is a very kewl development. I too have been working on a project utilizing either the 3A+ or the Zero 2W. The possibility of customizing an image is intriguing with respect to the same, limited RAM limitations on both platforms.
+John
+I’ve been using yocto (which has a nice raspberry pi layer) at work but 1. It has a pretty steep learning curve and 2. (more importantly) I have access to a 96 core behemoth of a build server. This looks like a very nice alternative!
+Joe
+I am using Armbian build framework for years. It is defacto standard in this world and much easier then Yocto.
+Lou
+Does this mean we’ll finally be able to update an RPi OS partition without deleting a separate data partition?
+Helen McCall
+Dear Lou,
+It has always been possible to write a new OS partition without affecting a data partition on the same device. You just need to learn to use the basic Unix/Linux command set. The command dd will write individual partitions.
+Matt Lear — post author
+Hi Lou. There is intentionally no profile for a Raspberry Pi OS Desktop or Lite system, but there is an experimental ‘AB’ image layout in the tree which basically gives you two copies of a bootable system allowing you to update one without affecting the other.
+Matheus Jose Geraldini dos Santos
+Right on time! I’m having a hard time to replicate my buildroot deployment for different Pi versions, so this can be a much better option instead.
+Mark
+Excellent, I will compare this to a really handy tool which leverages cloud-init, but hasn’t been updated since 2021 = https://github.com/hypriot/flash
+Richard
+Nice, using Yocto is great and all but very complicated. And a pain to keep up to date. And also overweight for personal projects. May well check this out instead as all I really need is a respin of Raspbian for kiosk mode. Nice one. :)
+hydra
+Is there a facility to generate profile(s) and config file(s) from an already configured running system ?
+Matt Lear — post author
+Hi. Not exactly. You do get a ‘recipe’ YAML file in the artefact directory at the end of a build (config.yaml) which lists all packages installed and all YAML script ops that were executed to create the image. It wouldn’t be possible to reverse engineer this to create a profile because a profile is just a simple text file which lists all YAML layers used, and each layer declares its own packages and script ops. Therefore from the recipe alone, you wouldn’t know what packages and scripts were associated to what layer(s). With that said, I’m open to the idea of describing the profile and config file used to create the image and perhaps embedding it in the image. However, as a user of the system you’d already know what profile and config file were used to build the image so I’m not sure why being able to generate a profile or config from a running system would benefit. If this is something of interest to you please create a ticket in the repo and we can discuss further. Thanks.
+Andreas Rueckert
+Thanks a lot for this cool tool! I was already capable of creating a small image within a few days.
+I have a question: is there an example with a rootfs-overlay?
+Matt Lear — post author
+Hi Andreas. Yes, the slim example has a device overlay. Overlays are optional. Note that an image overlay is always applied before a device overlay.
+Andreas Rueckert
+Hi!
+I have a question on the filenames in the bdepstrap directory. I edit the customize01 script and my editor (emacs) leaves a backup of the file, called customize01~ . Could it be, that this backup is executed after the customize01 script? Because I make changes, but it seems to me, that they get lost when the image is generated.
+Thanks in advance for any response,
+Andreas
+Matt Lear — post author
+Hi
+> Could it be, that this backup is executed after the customize01 script?
+Yes. The main hook runner will basically run any script that starts with setup, extract, essential, customize, cleanup, so if you have a file called customize01~ it will be executed. I agree that’s undesirable and while you can set backup-directory-alist in your .emacs to save backups elsewhere, I will make sure files that don’t contain alphanumeric characters are filtered out of the execution list.
+Comments are closed

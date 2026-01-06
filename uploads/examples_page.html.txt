@@ -1,0 +1,6 @@
+URL: https://www.raspberrypi.com/documentation/pico-sdk/examples_page.html
+
+examples_page
+Examples Index
+This page links to the various example code fragments in this documentation. For more complete examples, please see the pico-examples repository, which contains complete buildable projects.
+All examples are "Copyright (c) 2020 Raspberry Pi (Trading) Ltd", and are released under a 3-Clause BSD licence. Briefly, this means you are free to use the example code as long as you retain the copyright notice. Full details on the licence can be found here.

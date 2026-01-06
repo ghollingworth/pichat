@@ -1,0 +1,10 @@
+URL: https://www.raspberrypi.com/documentation/pico-sdk
+
+Introduction
+An introduction to the Pico SDKHardware APIs
+This group of libraries provides a thin and efficient C API / abstractions to access the RP-series microcontroller hardware without having to read and write hardware registers directly.High Level APIs
+This group of libraries provide higher level functionality that isn't hardware related or provides a richer set of functionality above the basic hardware interfacesThird-party Libraries
+Third party libraries for implementing high level functionality.Networking Libraries
+Functions for implementing networkingRuntime Infrastructure
+Libraries that are used to provide efficient implementation of certain language level and C library functions, as well as CMake INTERFACE libraries abstracting the compilation and link steps in the SDKExternal API Headers
+Headers for interfaces that are shared with code outside of the SDK

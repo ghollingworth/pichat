@@ -1,0 +1,11 @@
+URL: https://www.raspberrypi.com/documentation/pico-sdk/misc.html
+
+External API Headers
+Headers for interfaces that are shared with code outside of the SDK
+Constants for PICOBIN format. |
+|
+Header file for the PICOBOOT USB interface exposed by an RP2xxx chip in BOOTSEL mode. |
+|
+Header file for the UF2 format supported by a RP2xxx chip in BOOTSEL mode. |
+|
+Definition for the reset interface that may be exposed by the pico_stdio_usb library. |

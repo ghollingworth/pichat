@@ -1,0 +1,9 @@
+URL: https://www.raspberrypi.com/documentation/accessories/ssd-kit.html
+
+SSD Kit
+About
+Edit this on GitHub
+The Raspberry Pi SSD Kit bundles a Raspberry Pi M.2 HAT+ with a Raspberry Pi SSD.
+The Raspberry Pi SSD Kit includes a 16 mm stacking header, spacers, and screws to enable fitting on Raspberry Pi 5 alongside a Raspberry Pi Active Cooler.
+Install
+To install the Raspberry Pi SSD Kit, follow the installation instructions for the Raspberry Pi M.2 HAT+.

@@ -1,0 +1,17 @@
+URL: https://www.raspberrypi.com/documentation/computers
+
+Getting started
+How to get started with your Raspberry PiRaspberry Pi OS
+The official Raspberry Pi operating systemConfiguration
+Configuring your Raspberry Pi's settingsconfig.txt
+The Linux kernel
+How to configure and build a custom kernel for your Raspberry PiRemote access
+Accessing your Raspberry Pi remotelyCamera software
+Software and libraries for Raspberry Pi camera hardwareAI Kit and AI HAT+ software
+Software and libraries for artificial intelligence on a Raspberry Pi hardwareRaspberry Pi computer hardware
+Technical information about Raspberry Pi computer hardwareKeyboard computers
+Technical information about Raspberry Pi keyboard computersCompute Module hardware
+Technical information about Raspberry Pi Compute Module hardwareProcessors
+Technical information about the CPUs used by Raspberry PiSoftware sources
+Open source software by Raspberry PiLegacy config.txt
+options

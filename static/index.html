@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiChat - Raspberry Pi Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --primary: #c51a4a; /* Raspberry Pi redish color */
+            --secondary: #2f3542;
+            --bg: #f1f2f6;
+            --white: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--secondary);
+            display: flex;
+            height: 100vh;
+        }
+        #sidebar {
+            width: 350px;
+            flex-shrink: 0;
+            background-color: var(--white);
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        #right-sidebar {
+            width: 350px;
+            flex-shrink: 0;
+            background-color: var(--white);
+            border-left: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #system-instructions {
+            width: 100%;
+            height: 500px;
+            font-family: monospace;
+            font-size: 13px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        h1, h2 { color: var(--primary); }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        /* File Management Styles */
+        #file-list {
+            list-style: none;
+            padding: 0;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        .file-name {
+            cursor: pointer;
+            flex-grow: 1;
+            color: var(--secondary);
+            transition: color 0.2s;
+        }
+        .file-name:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+        .file-item:last-child { border-bottom: none; }
+        .delete-btn {
+            color: #ff4757;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-weight: bold;
+        }
+        #upload-form {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #ccc; }
+
+        /* Chat Styles */
+        #chat-window {
+            flex-grow: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.4;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: var(--primary);
+            color: white;
+        }
+        .bot-message {
+            align-self: flex-start;
+            background-color: #e4e6eb;
+            color: black;
+            position: relative;
+        }
+        .bot-message h1,
+        .bot-message h2,
+        .bot-message h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            font-weight: bold;
+        }
+        .bot-message h1 { font-size: 1.5em; }
+        .bot-message h2 { font-size: 1.3em; }
+        .bot-message h3 { font-size: 1.1em; }
+        .bot-message p {
+            margin: 0.5em 0;
+        }
+        .bot-message ul,
+        .bot-message ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+        .bot-message li {
+            margin: 0.25em 0;
+        }
+        .bot-message code {
+            background-color: rgba(0, 0, 0, 0.1);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        .bot-message pre {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+            white-space: pre;
+        }
+        .bot-message pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .bot-message blockquote {
+            border-left: 3px solid #ccc;
+            margin: 0.5em 0;
+            padding-left: 1em;
+            color: #666;
+        }
+        .bot-message strong {
+            font-weight: bold;
+        }
+        .bot-message em {
+            font-style: italic;
+        }
+        .copy-bbcode-btn {
+            font-size: 10px;
+            padding: 4px 8px;
+            margin-top: 8px;
+            background: #2f3542;
+            opacity: 0.7;
+        }
+        .copy-bbcode-btn:hover {
+            opacity: 1;
+        }
+        #chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+        }
+        .status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        #file-details-panel {
+            display: none;
+            flex-grow: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        .metadata-row {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 8px;
+        }
+        .metadata-label {
+            font-weight: bold;
+            width: 150px;
+            color: #555;
+        }
+        .metadata-value {
+            flex-grow: 1;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        #file-editor {
+            display: none;
+            margin-top: 20px;
+        }
+        #editor-textarea {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        #file-content-viewer {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h1>PiChat Admin</h1>
+        <div class="card">
+            <h2>Knowledge Base</h2>
+            <div id="upload-form">
+                <input type="file" id="file-input">
+                <button id="upload-btn">Upload Source</button>
+                <div id="upload-status" class="status"></div>
+            </div>
+            <hr>
+            <h3>Indexed Files</h3>
+            <ul id="file-list">
+                <!-- Files will be loaded here -->
+            </ul>
+            <div style="display: flex; gap: 10px; flex-direction: column;">
+                <button id="create-file-btn" style="background: #27ae60; margin-top: 10px;">Create New File</button>
+                <button id="refresh-files-btn" style="background: #2f3542; margin-top: 5px;">Refresh List</button>
+                <button id="clear-store-btn" style="background: #ff4757; margin-top: 5px;">Clear Knowledge Base</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main">
+        <div id="chat-window">
+            <div class="message bot-message">Hello! I'm your Raspberry Pi assistant. Ask me anything about hardware or software, and I'll use our curated knowledge base to answer.</div>
+        </div>
+        <div id="file-details-panel">
+            <div class="panel-header">
+                <h2 id="details-title" style="margin:0">File Details</h2>
+                <button onclick="hideFileDetails()" style="background:#2f3542">Back to Chat</button>
+            </div>
+            <div id="details-content">
+                <!-- Metadata will be loaded here -->
+            </div>
+            <div id="file-editor">
+                <input type="text" id="editor-filename" placeholder="filename.txt" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
+                <textarea id="editor-textarea" placeholder="Enter file content here..."></textarea>
+                <div style="margin-top:10px; display:flex; gap:10px;">
+                    <button id="save-file-btn">Save & Upload</button>
+                    <button id="cancel-edit-btn" style="background:#7f8c8d">Cancel</button>
+                </div>
+            </div>
+            <div id="file-content-viewer">
+                <!-- File content will be loaded here -->
+            </div>
+        </div>
+        <div id="chat-input-area">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" id="bbcode-mode"> phpBB Mode
+                </label>
+            </div>
+            <input type="text" id="chat-input" placeholder="e.g. How do I enable I2C on a Pi Zero?">
+            <button id="send-btn">Ask Question</button>
+        </div>
+    </div>
+
+    <div id="right-sidebar">
+        <h2>System Instructions</h2>
+        <div class="card">
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                Customize the AI's behavior for this session. These instructions will be prepended to the default system prompt.
+            </p>
+            <textarea id="system-instructions" placeholder="Enter custom system instructions here..."></textarea>
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                <button id="reset-instructions-btn" style="background: #7f8c8d; font-size: 12px; padding: 6px 12px;">Reset to Default</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+
+        // --- File Management ---
+        async function loadFiles() {
+            const list = document.getElementById('file-list');
+            if (!list) return;
+            list.innerHTML = '<li>Loading...</li>';
+            try {
+                const res = await fetch(`${API_URL}/files`);
+                const files = await res.json();
+                list.innerHTML = '';
+                if (files.error) throw new Error(files.error);
+                
+                if (files.length === 0) {
+                    list.innerHTML = '<li>No files indexed.</li>';
+                }
+
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = `
+                        <span class="file-name" onclick="showFileDetails('${file.name}')">${file.display_name}</span>
+                        <button class="delete-btn" onclick="deleteFile('${file.name}')">×</button>
+                    `;
+                    list.appendChild(li);
+                });
+            } catch (err) {
+                list.innerHTML = `<li style="color:red">Error: ${err.message}</li>`;
+            }
+        }
+
+        async function deleteFile(fileId) {
+            if (!confirm('Remove this source from knowledge base?')) return;
+            try {
+                const res = await fetch(`${API_URL}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                loadFiles();
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        async function handleUpload() {
+            const input = document.getElementById('file-input');
+            const status = document.getElementById('upload-status');
+            if (!input.files.length) return alert('Select a file first');
+
+            const file = input.files[0];
+            const isTar = file.name.endsWith('.tar.gz') || file.name.endsWith('.tgz');
+            const endpoint = isTar ? `${API_URL}/upload-tar` : `${API_URL}/upload`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            status.innerText = isTar ? 'Uploading and extracting archive...' : 'Uploading...';
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                if (isTar) {
+                    status.innerText = `Success! Uploaded ${result.files.length} files from archive.`;
+                } else {
+                    status.innerText = 'Upload started! Indexing...';
+                }
+                
+                input.value = '';
+                setTimeout(loadFiles, 3000);
+            } catch (err) {
+                status.innerText = 'Error: ' + err.message;
+            }
+        }
+
+        function showEditor(filename = '', content = '') {
+            const chatWindow = document.getElementById('chat-window');
+            const chatInput = document.getElementById('chat-input-area');
+            const detailsPanel = document.getElementById('file-details-panel');
+            const detailsContent = document.getElementById('details-content');
+            const contentViewer = document.getElementById('file-content-viewer');
+            const editor = document.getElementById('file-editor');
+            
+            chatWindow.style.display = 'none';
+            chatInput.style.display = 'none';
+            detailsPanel.style.display = 'block';
+            detailsContent.style.display = 'none';
+            contentViewer.style.display = 'none';
+            editor.style.display = 'block';
+            
+            document.getElementById('editor-filename').value = filename;
+            document.getElementById('editor-filename').disabled = filename !== '';
+            document.getElementById('editor-textarea').value = content;
+            document.getElementById('details-title').innerText = filename ? `Editing: ${filename}` : 'Create New File';
+        }
+
+        async function handleSaveFile() {
+            const filename = document.getElementById('editor-filename').value.trim();
+            const content = document.getElementById('editor-textarea').value;
+            const status = document.getElementById('upload-status');
+            
+            if (!filename) return alert('Please enter a filename');
+            
+            status.innerText = 'Saving and uploading...';
+            try {
+                const res = await fetch(`${API_URL}/files/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename, content })
+                });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                status.innerText = 'File saved and indexed!';
+                setTimeout(() => {
+                    hideFileDetails();
+                    loadFiles();
+                }, 1500);
+            } catch (err) {
+                status.innerText = 'Error saving file: ' + err.message;
+            }
+        }
+
+        async function handleClearStore() {
+            if (!confirm('CRITICAL: This will delete ALL indexed files and clear the entire knowledge base. Are you sure?')) return;
+            
+            const btn = document.getElementById('clear-store-btn');
+            const status = document.getElementById('upload-status');
+            
+            btn.disabled = true;
+            status.innerText = 'Clearing knowledge base...';
+            
+            try {
+                const res = await fetch(`${API_URL}/store/clear`, { method: 'POST' });
+                const result = await res.json();
+                
+                if (result.error) throw new Error(result.error);
+                
+                status.innerText = 'Knowledge base cleared successfully.';
+                hideFileDetails();
+                loadFiles();
+            } catch (err) {
+                status.innerText = 'Error clearing store: ' + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- Chat ---
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const btn = document.getElementById('send-btn');
+            const chatWindow = document.getElementById('chat-window');
+            const bbcodeToggle = document.getElementById('bbcode-mode');
+            const systemInstructions = document.getElementById('system-instructions');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            // Add user message
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user-message';
+            userDiv.innerText = text;
+            chatWindow.appendChild(userDiv);
+            input.value = '';
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            // Add loading placeholder
+            const botDiv = document.createElement('div');
+            botDiv.className = 'message bot-message';
+            botDiv.innerText = '...thinking...';
+            chatWindow.appendChild(botDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            btn.disabled = true;
+
+            try {
+                const useBbcode = bbcodeToggle ? bbcodeToggle.checked : false;
+                const customInstructions = systemInstructions ? systemInstructions.value.trim() : '';
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: text,
+                        bbcode: useBbcode,
+                        system_instruction: customInstructions || undefined
+                    })
+                });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                let botText = result.answer;
+                
+                // Check if answer contains HTML (from inline citations)
+                if (botText.includes('<a href') || botText.includes('<span')) {
+                    // We have inline citations, so we need to preserve them
+                    // First, parse Markdown if not in BBCode mode
+                    if (!useBbcode && typeof marked !== 'undefined') {
+                        // Temporarily escape our HTML citations so Markdown parser doesn't break them
+                        const citationPlaceholders = [];
+                        let placeholderIndex = 0;
+                        
+                        // Replace HTML citations with placeholders (use a pattern that won't be interpreted by Markdown)
+                        botText = botText.replace(/<a[^>]*>\[(\d+)\]<\/a>/g, (match, num) => {
+                            const placeholder = `<!--CITATION_${placeholderIndex}-->`;
+                            citationPlaceholders.push({ placeholder, html: match });
+                            placeholderIndex++;
+                            return placeholder;
+                        });
+                        
+                        botText = botText.replace(/<span[^>]*>\[(\d+)\]<\/span>/g, (match, num) => {
+                            const placeholder = `<!--CITATION_${placeholderIndex}-->`;
+                            citationPlaceholders.push({ placeholder, html: match });
+                            placeholderIndex++;
+                            return placeholder;
+                        });
+                        
+                        // Parse Markdown
+                        botText = marked.parse(botText);
+                        
+                        // Restore citations - use a more robust replacement
+                        citationPlaceholders.forEach(item => {
+                            // Escape special regex characters in placeholder
+                            const escapedPlaceholder = item.placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const regex = new RegExp(escapedPlaceholder, 'g');
+                            botText = botText.replace(regex, item.html);
+                        });
+                        botDiv.innerHTML = botText;
+                    } else {
+                        // No Markdown parsing, just convert newlines to <br> tags
+                        botText = botText.replace(/\n/g, '<br>');
+                        botDiv.innerHTML = botText;
+                    }
+                } else if (!useBbcode && typeof marked !== 'undefined') {
+                    // No inline citations, just parse Markdown normally
+                    botDiv.innerHTML = marked.parse(botText);
+                } else {
+                    // BBCode mode or no Markdown parser - display as plain text
+                    botDiv.innerText = botText;
+                }
+
+                // Add Citations if they exist
+                if (result.citations && result.citations.length > 0) {
+                    const citationContainer = document.createElement('div');
+                    citationContainer.style.marginTop = '10px';
+                    citationContainer.style.fontSize = '12px';
+                    citationContainer.style.color = '#555';
+                    citationContainer.style.borderTop = '1px solid #ddd';
+                    citationContainer.style.paddingTop = '5px';
+                    
+                    const citationTitle = document.createElement('div');
+                    citationTitle.style.fontWeight = 'bold';
+                    citationTitle.innerText = 'Sources:';
+                    citationContainer.appendChild(citationTitle);
+                    
+                    result.citations.forEach(c => {
+                        const link = document.createElement('a');
+                        link.style.display = 'block';
+                        link.style.color = 'var(--primary)';
+                        link.style.textDecoration = 'none';
+                        link.href = c.url || '#';
+                        link.target = '_blank';
+                        link.innerText = `[source] ${c.title}`;
+                        if (!c.url) {
+                            link.style.color = '#888';
+                            link.style.cursor = 'default';
+                        }
+                        citationContainer.appendChild(link);
+                    });
+                    botDiv.appendChild(citationContainer);
+                }
+
+                // Add Copy for phpBB button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-bbcode-btn';
+                copyBtn.innerText = 'Copy for phpBB';
+                copyBtn.onclick = () => {
+                    navigator.clipboard.writeText(result.answer);
+                    copyBtn.innerText = 'Copied!';
+                    setTimeout(() => copyBtn.innerText = 'Copy for phpBB', 2000);
+                };
+                botDiv.appendChild(copyBtn);
+
+            } catch (err) {
+                botDiv.innerText = 'Error: ' + err.message;
+                botDiv.style.color = 'red';
+            } finally {
+                btn.disabled = false;
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+
+        // --- Details Panel ---
+        async function showFileDetails(fileId) {
+            const chatWindow = document.getElementById('chat-window');
+            const chatInput = document.getElementById('chat-input-area');
+            const detailsPanel = document.getElementById('file-details-panel');
+            const detailsContent = document.getElementById('details-content');
+            const contentViewer = document.getElementById('file-content-viewer');
+            
+            chatWindow.style.display = 'none';
+            chatInput.style.display = 'none';
+            detailsPanel.style.display = 'block';
+            contentViewer.style.display = 'none';
+            
+            detailsContent.innerHTML = '<p>Loading details...</p>';
+            
+            try {
+                const res = await fetch(`${API_URL}/files/${encodeURIComponent(fileId)}`);
+                const file = await res.json();
+                
+                if (file.error) throw new Error(file.error);
+                
+                let html = '';
+                const fields = [
+                    { label: 'Display Name', value: file.display_name },
+                    { label: 'Resource Name', value: file.name },
+                    { label: 'State', value: file.state },
+                    { label: 'Mime Type', value: file.mime_type },
+                    { label: 'Size', value: `${(file.size_bytes / 1024).toFixed(2)} KB (${file.size_bytes} bytes)` },
+                    { label: 'Created', value: new Date(file.create_time).toLocaleString() },
+                    { label: 'Last Updated', value: file.update_time ? new Date(file.update_time).toLocaleString() : 'N/A' }
+                ];
+                
+                fields.forEach(f => {
+                    html += `
+                        <div class="metadata-row">
+                            <div class="metadata-label">${f.label}</div>
+                            <div class="metadata-value">${f.value}</div>
+                        </div>
+                    `;
+                });
+                
+                if (file.custom_metadata) {
+                    html += `<h3 style="margin-top:20px">Custom Metadata</h3>`;
+                    for (const [key, value] of Object.entries(file.custom_metadata)) {
+                        html += `<div class="metadata-row"><div class="metadata-label">${key}</div><div class="metadata-value">${value}</div></div>`;
+                    }
+                }
+
+                html += `
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button onclick="loadFileContent('${file.display_name}')" style="background: #2f3542">View Content</button>
+                        <button onclick="editCurrentFile('${file.display_name}')" style="background: #27ae60">Edit File</button>
+                    </div>
+                `;
+                
+                detailsContent.innerHTML = html;
+                document.getElementById('details-title').innerText = file.display_name;
+                
+            } catch (err) {
+                detailsContent.innerHTML = `<p style="color:red">Error loading details: ${err.message}</p>`;
+            }
+        }
+
+        async function editCurrentFile(filename) {
+            try {
+                const res = await fetch(`${API_URL}/files/content/${encodeURIComponent(filename)}`);
+                if (!res.ok) throw new Error('Could not load local copy for editing');
+                const content = await res.text();
+                showEditor(filename, content);
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function loadFileContent(filename) {
+            const viewer = document.getElementById('file-content-viewer');
+            viewer.style.display = 'block';
+            viewer.innerText = 'Loading content...';
+            try {
+                const res = await fetch(`${API_URL}/files/content/${encodeURIComponent(filename)}`);
+                if (!res.ok) throw new Error('Could not load local copy of file');
+                const text = await res.text();
+                viewer.innerText = text;
+            } catch (err) {
+                viewer.innerText = 'Error: ' + err.message;
+            }
+        }
+
+        function hideFileDetails() {
+            document.getElementById('chat-window').style.display = 'flex';
+            document.getElementById('chat-input-area').style.display = 'flex';
+            document.getElementById('file-details-panel').style.display = 'none';
+            document.getElementById('details-content').style.display = 'block';
+            document.getElementById('file-editor').style.display = 'none';
+        }
+
+        // Initialize system instructions with default
+        async function initializeSystemInstructions() {
+            const systemInstructions = document.getElementById('system-instructions');
+            if (systemInstructions) {
+                try {
+                    const res = await fetch(`${API_URL}/system-instruction`);
+                    const result = await res.json();
+                    if (result.system_instruction) {
+                        systemInstructions.value = result.system_instruction;
+                    }
+                } catch (err) {
+                    console.error('Error loading system instruction:', err);
+                    systemInstructions.placeholder = 'Error loading system instructions';
+                }
+            }
+        }
+
+        async function resetSystemInstructions() {
+            const systemInstructions = document.getElementById('system-instructions');
+            if (systemInstructions) {
+                try {
+                    const res = await fetch(`${API_URL}/system-instruction`);
+                    const result = await res.json();
+                    if (result.system_instruction) {
+                        systemInstructions.value = result.system_instruction;
+                    }
+                } catch (err) {
+                    console.error('Error loading system instruction:', err);
+                }
+            }
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('upload-btn').onclick = handleUpload;
+            document.getElementById('refresh-files-btn').onclick = loadFiles;
+            document.getElementById('create-file-btn').onclick = () => showEditor();
+            document.getElementById('save-file-btn').onclick = handleSaveFile;
+            document.getElementById('cancel-edit-btn').onclick = hideFileDetails;
+            document.getElementById('clear-store-btn').onclick = handleClearStore;
+            document.getElementById('send-btn').onclick = sendMessage;
+            document.getElementById('reset-instructions-btn').onclick = resetSystemInstructions;
+            document.getElementById('chat-input').onkeypress = (e) => {
+                if (e.key === 'Enter') sendMessage();
+            };
+            initializeSystemInstructions();
+            loadFiles();
+        });
+    </script>
+</body>
+</html>
+

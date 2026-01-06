@@ -1,0 +1,13 @@
+URL: https://www.raspberrypi.com/documentation/pico-sdk/third_party.html
+
+Third-party Libraries
+tinyusb_host
+TinyUSB Host-mode support for the RP2040.
+pico_mbedtls
+Detailed Description
+Builds mbedtls for pico-sdk and implements functions to take advantage of hardware support, if enabled in mbedtls_config.h
+-
+MBEDTLS_ENTROPY_HARDWARE_ALT,
+implementation of a hardware entropy collector that uses get_rand_64 -
+MBEDTLS_SHA256_ALT,
+use SHA256 hardware acceleration. Only valid if LIB_PICO_SHA256 is defined (i.e. not available for rp2040)

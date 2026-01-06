@@ -1,0 +1,12 @@
+URL: https://www.raspberrypi.com/documentation/services
+
+Raspberry Pi ID
+Our identity serviceRaspberry Pi Connect
+Connect to your Raspberry Pi from your browserBookshelf
+Read titles published by Raspberry Pi PressRaspberry Pi ID
+Our identity serviceRaspberry Pi Connect
+Connect to your Raspberry Pi from your browserBookshelf
+Read titles published by Raspberry Pi PressYou can view and edit the Raspberry Pi documentation source on Github. Please read our usage and contributions policy before you make a Pull Request.
+Raspberry Pi documentation is copyright © 2012-2025 Raspberry Pi Ltd and is licensed under a Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA) licence.
+Some content originates from the eLinux wiki, and is licensed under a Creative Commons Attribution-ShareAlike 3.0 Unported licence.
+The terms HDMI, HDMI High-Definition Multimedia Interface, HDMI trade dress and the HDMI Logos are trademarks or registered trademarks of HDMI Licensing Administrator, Inc

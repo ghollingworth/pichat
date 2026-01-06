@@ -1,0 +1,486 @@
+URL: https://www.raspberrypi.com/documentation/services/connect.html
+
+Raspberry Pi Connect
+Introduction
+Edit this on GitHub
+Raspberry Pi Connect provides secure access to your Raspberry Pi from anywhere in the world.
+Connect is installed by default in Raspberry Pi OS Desktop and Raspberry Pi OS Full (desktop with recommended software). An alternate Lite variant of Connect, that only supports remote shell access with no ability to screen share, is installed by default in Raspberry Pi OS Lite.
+To use Connect, link your device with a Connect account. Visit connect.raspberrypi.com to access the desktop or a shell running on your Raspberry Pi in a browser window.
+Connect uses a secure, encrypted connection. By default, Connect communicates directly between your Raspberry Pi and your browser. However, when Connect can’t establish a direct connection between your Raspberry Pi and your browser, we use a relay server. In such cases, Raspberry Pi only retains the metadata required to operate Connect.
+|
+Note
+|
+To use Connect, your Raspberry Pi must run Raspberry Pi OS Bookworm or later. |
+Manually start and stop Connect
+Edit this on GitHub
+To start Connect or Connect Lite from the command line, run the following command:
+$ rpi-connect on
+To stop Connect, run the following command:
+$ rpi-connect off
+Link a Raspberry Pi device with a Connect account
+Edit this on GitHub
+After starting Connect on your Raspberry Pi device, you must associate your device with your Connect account.
+If you used Raspberry Pi Imager to install Raspberry Pi OS on your device, you might have already linked your device with your Connect account. For more information, see Install using Imager.
+-
+Desktop
+-
+CLI
+-
+Using an Auth Key
+From the Connect icon in the menu bar, select Turn On Raspberry Pi Connect. This opens your browser, where you’re prompted to sign in with your Raspberry Pi ID:
+If you’ve already turned on Connect, choose Sign In… from the dropdown menu:
+If you don’t already have a Raspberry Pi ID, select the create one for free link to create one.
+Use the following command to generate a link that connects your device with your Connect account:
+$ rpi-connect signin
+This command outputs something like the following:
+Complete sign in by visiting https://connect.raspberrypi.com/verify/XXXX-XXXX
+To link your device with your Connect account, visit the verification URL on any device and sign in with your Raspberry Pi ID.
+An auth key is a single-use, temporary token that lets you link a device to a Connect account automatically (without using the web interface).
+The easiest way of creating and using an auth key is by using the customisation options in Imager. You can also manually create an auth key from the Settings page of a personal or organisation’s Connect account, and organisation administrators can create auth keys using the management API.
+|
+Note
+|
+Personal accounts can only have one auth key active at a time; organisations can have multiple auth keys active at once. You need a unique auth key for each device. |
+|
+Tip
+|
+The Raspberry Pi Connect website displays how long after its creation the auth key expires. To use the auth key, ensure that you boot your Raspberry Pi and connect it to the internet before the expiry time. |
+After creating an auth key, you can provide this to your device using the rpi-connect signin
+command, or by writing the auth key to a file in your home directory.
+To provide your auth key as a string, run the following command:
+$ rpi-connect signin --auth-key=rpuak_123456
+If you have saved your auth key to a file, you can pass its full path to the command by prefixing it with @
+:
+$ rpi-connect signin --auth-key=@/home/alice/auth.key
+If you save your auth key to .config/com.raspberrypi.connect/auth.key
+in your home directory, Connect detects it automatically.
+Finish linking your Raspberry Pi
+After authenticating, assign a name to your device. Choose a name that uniquely identifies the device.
+If you’re an administrator of an organisation, select whether to add this device to your personal account or to a specific organisation.
+Select the Create device and sign in button to continue.
+You can now remotely connect to your device. The Connect icon in your menu bar turns blue to indicate that your device is signed in to the Connect service. You should receive an email notification indicating that a new device is linked to your Connect account.
+|
+Warning
+|
+If you receive an email that says a device that you don’t recognise has signed into Connect, change your Raspberry Pi ID password immediately. Follow the instructions in Remove the device from Connect to permanently disassociate it from your account. Consider enabling two-factor authentication to keep your account secure. |
+Open the Connect menu by selecting the Connect icon in your menu bar. This menu allows you to turn Connect on and off, sign in and out, and allow or disallow remote access methods.
+|
+Note
+|
+Connect signs communication with your device’s serial number. Moving your SD card between devices signs you out of Connect. |
+Access your Raspberry Pi device
+Now that your device appears on your Connect dashboard, you can access your device from anywhere using only a browser. Connect provides multiple ways to interact with your device remotely.
+Screen sharing
+Connect includes the ability to share your device’s screen in a browser. Use the following instructions to share your device’s screen.
+|
+Note
+|
+Screen sharing requires the Wayland window server. Raspberry Pi OS Bookworm and later use Wayland by default. Screen sharing is not compatible with Raspberry Pi OS Lite or systems that use the X window server. |
+Visit connect.raspberrypi.com on any computer.
+Connect redirects you to the Raspberry Pi ID service to sign in. After signing in, Connect displays a list of linked devices. Devices available for screen sharing show a grey Screen sharing badge below the name of the device.
+Select the Connect via button to the right of the device you want to access. Select the Screen sharing option from the menu. This opens a browser window that displays your device’s desktop.
+You can now use your device as you would locally. For more information about the connection, hover your mouse over the padlock icon immediately to the right of the Disconnect button.
+|
+Tip
+|
+Use the Copy from remote and Paste to remote buttons above your desktop to transfer text between your local and remote clipboards. |
+Once connected, a green dot appears next to the Screen sharing badge in the Connect dashboard. This indicates an active screen sharing session. Hover to see the current number of screen sharing sessions.
+The Connect icon in the system tray rotates when a screen sharing session is in progress. A desktop notification appears whenever a screen sharing session starts.
+Stop screen sharing
+To close a screen sharing session, select the Disconnect button above your desktop.
+Disallow screen sharing
+To turn off screen sharing, select the Connect icon in the menu bar then deselect Allow Screen Sharing. Your device remains signed in to Connect, but you can’t create a screen sharing session from the Connect dashboard.
+Alternatively, you can disallow screen sharing with the following command:
+$ rpi-connect vnc off
+In the Connect dashboard, the Screen sharing badge and the Screen sharing option in the Connect via menu will appear crossed-out.
+To re-enable screen sharing, do one of the following:
+-
+Select the Connect icon in the menu bar and then choose Allow Screen Sharing
+-
+Run the following command:
+$ rpi-connect vnc on
+Remote shell
+Connect includes the ability to start a shell running on your device from a browser. Use the following instructions to access the remote shell.
+Visit connect.raspberrypi.com on any computer.
+Connect redirects you to the Raspberry Pi ID service to sign in. After signing in, Connect displays a list of linked devices. Devices available for remote shell access show a grey Remote shell badge below the name of the device.
+Select the Connect via button to the right of the device you would like to access. Select the Remote shell option from the menu. This opens a shell session on your device.
+You can now use your device as you would locally.
+|
+Tip
+|
+On some operating systems, the browser intercepts key combinations like Ctrl+Shift+C and Ctrl+C. Instead, you can use the right click menu or Ctrl+Insert to copy and Shift+Insert to paste. |
+Once connected, a green dot appears next to the Remote shell badge in the Connect dashboard. This indicates an active remote shell session. Hover to see the current number of remote shell sessions.
+|
+Tip
+|
+Every remote shell connection creates a brand new connection, just like SSH. To persist background commands and configuration across multiple sessions, use screen or tmux .
+|
+The Connect icon in the menu bar rotates when a remote shell session is in progress. A desktop notification appears whenever a remote shell session starts.
+|
+Tip
+|
+The CONNECT_TTY environment variable indicates that a session uses a remote shell provided by Connect.
+|
+End your remote shell session
+To close a remote shell session, run the exit
+command or close the window.
+Disallow remote shell access
+To turn off remote shell access, select the Connect icon in the menu bar and then deselect Allow Remote Shell Access. Your device remains signed in to Connect, but you can’t create a remote shell session from the Connect dashboard.
+Alternatively, you can disallow remote shell access with the following command:
+$ rpi-connect shell off
+In the Connect dashboard, the Remote shell badge and the Remote shell option in the Connect via menu will appear crossed-out.
+To re-enable remote shell access, do one of the following:
+-
+Select the Connect system tray icon and choose Allow Remote Shell Access
+-
+Run the following command:
+$ rpi-connect shell on
+Enable remote shell at all times
+Connect runs as a user-level service, not as root. As a result, Connect only works when your user account is currently logged in on your device. This can make your device unreachable if you reboot with automatic login disabled. To continue running Connect even when you aren’t logged into your device, enable user-lingering. Run the following command from your user account to enable user-lingering:
+$ loginctl enable-linger
+|
+Tip
+|
+We recommend enabling user-lingering on all headless Raspberry Pi OS Lite setups to prevent your device from becoming unreachable after a remote reboot. |
+Disable the animated icon
+To disable the animated icon when a screen sharing or remote shell session are in progress, right-click the Connect icon in the menu bar and select Configure Plugin….
+Select the Animate Icon toggle to switch to an alternate icon.
+When a screen sharing or remote shell session is in progress, the Connect icon turns blue.
+Manage devices
+The Connect dashboard lists all of the devices linked with your Connect account and shows you the various ways you can access them.
+Select a device name to open the device details page. This screen provides low-level information about your device. You can also edit the device name or remove the device from Connect.
+Deleting a device from Connect automatically signs you out of Connect on the device. The Connect icon in the menu bar turns grey and the menu only provides a Sign In… option.
+Update
+To update to the latest version of Connect, run the following command:
+$ sudo apt update
+$ sudo apt install --only-upgrade rpi-connect
+|
+Tip
+|
+If you installed Connect Lite, replace rpi-connect with rpi-connect-lite in the above command.
+|
+Disconnect a device from Connect
+Run the following command on your device to sign out of your Raspberry Pi ID, which will disable your device on the Connect screen:
+$ rpi-connect signout
+Alternatively, select the Connect icon in the menu bar and choose "Sign Out".
+|
+Tip
+|
+To fully remove a device from your Connect account, remove it from the Connect dashboard. |
+Uninstall
+Run the following command to stop and remove Connect from a device:
+$ sudo apt remove --purge rpi-connect
+|
+Tip
+|
+If you installed Connect Lite, replace rpi-connect with rpi-connect-lite in the above command.
+|
+After uninstalling, the serial number of the device remains linked with your Connect account. The device still appears in the Connect dashboard, but can’t be used for remote access. If you install Connect again, even with a different SD card, on the same device, it will reuse the existing device name in the Connect dashboard.
+To sever the link between a device and a Connect account, remove the device from the list of devices in the Connect dashboard.
+Connect for Organisations
+Edit this on GitHub
+Connect for Organisations lets multiple users share access to devices. Creating an organisation automatically starts a free, four-week trial for that organisation.
+Create an organisation
+To create a new organisation, first sign in to your Raspberry Pi Connect account and then select the account switcher icon in the top left of the navigation menu.
+Select New organisation and provide a name, then select Start your free trial. Your Connect account is automatically added to the organisation as an administrator.
+Invite users
+You must be an administrator to invite other users to your organisation. To invite a user:
+-
+Open the Users tab at the top of the page. This shows all members of your organisation, with their name, email, role, and join date.
+-
+Select Invite someone to add a new user to your organisation.
+-
+Choose a Role from the dropdown menu. There are two roles available for members of an organisation:
+-
+Member. A user that can remotely access all devices within an organisation but can’t make any changes to the organisation.
+-
+Administrator. A user that can remotely access all devices within an organisation and make changes to the organisation. They also receive organisation-wide notification emails for sensitive actions, such as the addition of new devices and new management API access tokens.
+-
+-
+Enter the email address where you want to send the invitation.
+-
+Select Send invitation.
+The person you invite doesn’t need to sign in with that email address. They can join using any valid Raspberry Pi ID.
+Link a Raspberry Pi device with an organisation
+You must be an administrator to link a device to an organisation. To link a device to an organisation:
+-
+If the device isn’t linked to a Connect account, see Link a Raspberry Pi device with a Connect account.
+-
+If the device is already linked to a Connect account, see Transfer a device.
+Transfer a device
+You must be an administrator to transfer a device between accounts. To transfer a device:
+-
+Select the account switcher icon in the top left of the navigation menu.
+-
+Switch to the account that currently owns the device (your personal account or an organisation).
+-
+Select the device you want to transfer.
+-
+Open the Settings dropdown menu from the top right of the device page.
+-
+Select Transfer…
+-
+Select the account you want to transfer the device to.
+-
+Select Transfer.
+Set up your subscription
+A subscription to Connect for Organisations starts when your four-week trial period ends, after which, you’re billed in arrears every month.
+You must be an administrator to set up a subscription. To set up a subscription:
+-
+Select Set up billing from the trial banner underneath the tabs at the top of the page.
+-
+Enter the email address to which you want to receive billing-related notifications such as invoices.
+-
+Enter your payment method details and submit them.
+-
+If you still have trial days left, the button says Start trial. Your trial continues, then you’ll be billed monthly.
+-
+If your trial has ended, the button says Pay and subscribe. This starts your monthly subscription.
+-
+Once your free trial ends, you won’t be able to remotely access the devices in your organisation until you set up a subscription.
+View the audit log
+The audit log shows all activity from the past 90 days ordered chronologically, with the most recent events first. Events include things like changes to devices, organisation members, API access tokens, and remote access sessions. Events that took place over 90 days ago are automatically deleted.
+You must be an administrator to view the activity in your organisation from the past 90 days. To view the audit log, open the Audit log tab at the top of the page.
+Each event in the list includes the following information:
+-
+Timestamp. The time of the event.
+-
+Source. Whether the event occurred in the dashboard or through the API.
+-
+Action. The action (for example, API access token created) and associated details.
+-
+Subject. The subject of the action, such as a specific device, organisation, or access token.
+-
+Actor. The user that performed the event, including the country in which the event happened.
+You can filter events by types of action (such as Remote shell session started). To filter the list, select the Actions dropdown menu next to Filters above the top-left corner of the list.
+Select Download CSV above the top-right corner of the list to download it in CSV format.
+Change organisation settings
+Administrators of an organisation can configure the following from the Settings tab at the top of the page.
+Rename the organisation
+To change the name of the organisation, enter a new name in the General section. This won’t affect your devices or the members of your organisation.
+Create auth keys
+To link a device with Connect automatically (without using the web interface), create an auth key. Select New from the Auth keys section and enter a description and expiry time in days.
+Your new auth key appears. Select the clipboard icon next to it to copy it. Copy this auth key now because it can’t be viewed again later.
+|
+Important
+|
+Your auth key is only shown once. Copy it now, because you won’t be able to see it again later. |
+Create management API access tokens
+To create auth keys automatically (without using the web interface) to link a device with Connect, you can create an API access token for the Connect for Organisations management API. Select New from the API access tokens section and enter a description for the access token.
+Your new access token appears. Select the clipboard icon next to it to copy it. Copy this access token now because it can’t be viewed again later.
+|
+Important
+|
+Your access token is only shown once. Copy it now, because you won’t be able to see it again later. |
+Management API
+The Management API lets you manage your organisation automatically, without using the Connect web interface. Requests to the Management API must be authenticated using a valid management API access token.
+Create an auth key
+To create an auth key to link a device with Connect automatically (without using the web interface), use a management API access token to make the following HTTP request.
+Replace these values in the code blow:
+-
+rporg_accesstokenhere
+: your management API access token -
+my-auth-key
+: a description for your auth key -
+1
+: how many days until the auth key expires (optional, defaults to 1 day)
+-
+HTTP
+-
+curl
+POST /organisation/auth-keys HTTP/1.1
+Host: api.connect.raspberrypi.com
+Authorization: Bearer rporg_accesstokenhere
+Content-Type: application/x-www-form-urlencoded
+description=my-auth-key&ttl_days=1
+$ curl --header 'Authorization: Bearer rporg_accesstokenhere' --data-urlencode 'description=my-auth-key' --data-urlencode 'ttl_days=1' https://api.connect.raspberrypi.com/organisation/auth-keys
+If successful, you get a 201 Created response with your auth key in JSON format. For example:
+HTTP/2 201
+Content-Type: application/json; charset=utf-8
+{"id":"12345","description":"my-auth-key","secret":"rpoak_123456","expires_at":"2025-01-01T00:00:30Z"}
+The response contains the following fields:
+- id
+-
+A unique identifier for the auth key.
+- description
+-
+The description used to create the auth key.
+- secret
+-
+A random token prefixed with
+rpoak_
+. - expires_at
+-
+The date and time when the key will expire (in ISO 8601 format).
+The secret
+can then be used to link a device with Connect before it expires.
+If your management API access token is invalid, you get a 401 Unauthorized response.
+If the auth key can’t be created, you get a 422 Unprocessable Content response.
+HTTP/2 422
+Content-Type: application/json; charset=utf-8
+{"message":"Validation failed: Description can't be blank"}
+|
+Note
+|
+You can also manually create an auth key on your organisation’s Settings page. |
+Troubleshooting
+Edit this on GitHub
+Known issues
+-
+Screen sharing only supports sharing a single, primary display of your Raspberry Pi. When a Raspberry Pi is connected to multiple HDMI screens, Connect sometimes shares the contents of the secondary screen. You can work around this by right-clicking the desktop and changing the location of the taskbar in Desktop Preferences….
+-
+Connect does not support on-screen keyboards. For full functionality, use a physical keyboard.
+-
+Connect requires a browser that implements ECMAScript 2022 (ES13) as it makes use of features unavailable in older browsers.
+-
+Browsers intercept certain keys and key combinations. As a result, you can’t type these keys into your Connect window. Screen sharing includes a toolbar to simulate some of the most popular intercepted keys.
+-
+Upgrading
+rpi-connect
+andrpi-connect-lite
+using Connect’s remote shell is not supported. The upgrade process will terminate all remote shell sessions and drop all connections. To upgrade Connect in a remote shell session, use a tool likescreen
+ortmux
+to ensure the process continues uninterrupted after your connection is closed. -
+To upgrade from version 1 to version 2, you must first upgrade the package you currently have installed before switching between
+rpi-connect
+andrpi-connect-lite
+. This ensures that Connect’s services properly migrate to the version 2 format. If you currently haverpi-connect
+installed, run the following command:$ sudo apt install --only-upgrade rpi-connect
+Alternatively, if you currently have
+rpi-connect-lite
+installed, run the following command:$ sudo apt install --only-upgrade rpi-connect-lite
+You should see output similar to the following during the upgrade, indicating that Connect’s services have migrated to the version 2 format:
+Replacing globally-enabled rpi-connect services with user-enabled ones...
+Common issues
+Screen sharing not available
+If Connect states that screen sharing is unavailable, one or more requirements for screen sharing support are not met. To help debug the problem, rpi-connect
+and rpi-connect-lite
+include the doctor
+command. Use rpi-connect doctor
+to identify issues with screen sharing.
+Run the following command:
+$ rpi-connect doctor
+If all is well, you should see output similar to the following:
+Screen sharing is supported by this version of rpi-connect ✓ Wayland compositor available ✓ Screen sharing services enabled and active ✓ Communication with Raspberry Pi Connect WebSocket server ✓ Communication with Raspberry Pi Connect API ✓ Authentication with Raspberry Pi Connect API ✓ Peer-to-peer connection candidate via STUN ✓ Peer-to-peer connection candidate via TURN
+If there is an issue, you will see something like so:
+Screen sharing is supported by this version of rpi-connect ✓ Wayland compositor available ✗ Screen sharing services enabled and active - Please run rpi-connect on to enable and start all required services ✓ Communication with Raspberry Pi Connect WebSocket server ✓ Communication with Raspberry Pi Connect API ✓ Authentication with Raspberry Pi Connect API ✓ Peer-to-peer connection candidate via STUN ✓ Peer-to-peer connection candidate via TURN ✗ Some checks failed
+If you have repeated issues trying to run Connect’s required services, run the following commands to check their status in more detail:
+$ systemctl --user status rpi-connect-wayvnc.service
+$ journalctl --follow --user-unit rpi-connect-wayvnc.service
+If the service fails to start or doesn’t exist, ensure that your environment meets the following criteria:
+-
+You use
+rpi-connect
+version 1.1.0 or later. -
+You do not use
+rpi-connect-lite
+, which lacks screen sharing support. -
+You use a Wayland compositor such as wayfire or labwc, not X. You can control this setting via
+raspi-config
+'s Advanced Options. -
+You use a desktop environment supported by WayVNC, e.g. Raspberry Pi Desktop. For instance, using KDE switches your Wayland compositor to kwin, which is unsupported.
+-
+You have an active graphical desktop session running as the same user as the one you signed into. For most, this means enabling "Desktop Autologin" via
+raspi-config
+'s System Options.
+Can’t connect after restarting or ending SSH session
+Connect runs as a user-level service and is therefore only available if there is an active session for the user signed into the service. If you want remote shell access without also running another login session, enable user-lingering for your user, which will keep Connect running at all times.
+For screen sharing, Connect can only share an existing graphical desktop session: it does not create entirely new sessions. There must already be a desktop session in progress. To start such a session automatically on boot, enable Desktop Autologin via raspi-config
+'s System Options.
+Networking and firewall issues
+Connect usually communicates between devices without requiring changes to your network or firewall. However, especially restrictive networks can sometimes block Connect communication. To help debug problems with such networks, rpi-connect
+and rpi-connect-lite
+include the rpi-connect doctor
+command. rpi-connect doctor
+runs a series of tests to check that Connect communication functions properly on your network.
+To run these tests on your device, run the following command:
+$ rpi-connect doctor
+If Connect can communicate properly on your network, you should see output similar to the following:
+Screen sharing is supported by this version of rpi-connect ✓ Wayland compositor available ✓ Screen sharing services enabled and active ✓ Communication with Raspberry Pi Connect WebSocket server ✓ Communication with Raspberry Pi Connect API ✓ Authentication with Raspberry Pi Connect API ✓ Peer-to-peer connection candidate via STUN ✓ Peer-to-peer connection candidate via TURN
+If Connect can’t communicate properly on your network, you’ll see an "x" instead of a check next to the failing test case. Ask your network administrator to enable the following connections on your network:
+-
+HTTPS requests to the Raspberry Pi Connect API and WebSocket server on port 443 of
+api.connect.raspberrypi.com
+andws.connect.raspberrypi.com
+-
+requests to Raspberry Pi Connect STUN or TURN servers on UDP port 3478 of all of the following:
+-
+stun.raspberrypi.com
+-
+turn1.raspberrypi.com
+-
+turn2.raspberrypi.com
+-
+turn3.raspberrypi.com
+-
+-
+requests to Raspberry Pi Connect TURN servers on TCP ports 3478 or 443 of all of the following:
+-
+turn1.raspberrypi.com
+-
+turn2.raspberrypi.com
+-
+turn3.raspberrypi.com
+-
+-
+requests to Raspberry Pi Connect TURN servers on UDP ports 3478, 443, or 49152 → 65535 of all of the following:
+-
+turn1.raspberrypi.com
+-
+turn2.raspberrypi.com
+-
+turn3.raspberrypi.com
+-
+View Connect status
+To view the current status of the Connect service, run the following command:
+$ rpi-connect status
+You should see output similar to the following:
+Signed in: yes Subscribed to events: yes Screen sharing: allowed (0 sessions active) Remote shell: allowed (0 sessions active)
+The output of this command indicates whether or not you are currently signed in to Connect, as well as the remote services enabled on your Raspberry Pi.
+If you see output including "Raspberry Pi Connect is not running, run rpi-connect on", run rpi-connect on
+to start Connect.
+Enable enhanced logging
+You can enable debug logging for both rpi-connect
+and its dedicated WayVNC server for a detailed account of local operations on your Raspberry Pi.
+Enable enhanced logging in rpi-connect
+Override the rpi-connect
+service definition with the following command:
+$ systemctl --user edit rpi-connect
+Enter the following lines of configuration between the comments:
+[Service]
+ExecStart=
+ExecStart=/usr/bin/rpi-connectd -socket %t/rpi-connect-wayvnc.sock -v
+|
+Note
+|
+You need both lines that begin with ExecStart= .
+|
+Finally, restart Connect with the following command:
+$ rpi-connect restart
+Enable enhanced logging in the dedicated wayvnc
+server
+Override the rpi-connect-wayvnc
+service definition with the following command:
+$ systemctl --user edit rpi-connect-wayvnc
+Enter the following lines of configuration between the comments (including the -Ldebug
+flag):
+[Service]
+ExecStart=
+ExecStart=/usr/bin/rpi-connect-env /usr/bin/wayvnc --config /etc/rpi-connect/wayvnc.config --render-cursor --unix-socket --socket=%t/rpi-connect-wayvnc-ctl.sock -Ldebug %t/rpi-connect-wayvnc.sock
+|
+Note
+|
+You need both lines that begin with ExecStart= .
+|
+Finally, restart Connect with the following command:
+$ rpi-connect restart
+Security
+Edit this on GitHub
+All connections between Raspberry Pi devices and the user’s browser use WebRTC: the same real-time communication technology used by Zoom, Microsoft Teams, and Google Meet.
+This means that all screen sharing and remote shell access traffic is encrypted using DTLS on the Raspberry Pi device and the user’s browser. We don’t (and can’t) decrypt the traffic, ensuring your data remains private.
+Furthermore, traffic is mostly peer-to-peer, meaning that the encrypted traffic doesn’t pass through our infrastructure. Instead, the encrypted traffic is sent directly between your Raspberry Pi device and your browser. This makes it impossible for us to observe it.
+In situations where direct peer-to-peer connections aren’t possible (for example, due to networking issues), only encrypted data is relayed through one of our TURN servers. These servers are hosted in London and California, and your traffic is routed through the relay closest to you. We don’t have the keys to decrypt this data, and it’s neither logged nor stored.
+The Raspberry Pi Connect API temporarily stores the IP addresses and ports required to negotiate a peer-to-peer connection. All traffic to this API is encrypted using HTTP over TLS, supporting only TLS 1.2 and newer for security. This ensures that connection information is never sent in the clear. This metadata is stored securely for at most 1 minute, and deleted as soon as a connection is established.
+Raspberry Pi Connect, along with its API and software components, has undergone security assessments by penetration testing and security analysts at Cure53.
+For more details on WebRTC security, see A Study of WebRTC Security.
+For Connect for Organisations customers, we provide an audit log to review activity from the past 90 days. To preserve privacy, we store only the country code when geolocating events by IP address.

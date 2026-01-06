@@ -1,0 +1,56 @@
+URL: https://www.raspberrypi.com/documentation/microcontrollers/micropython.html
+
+MicroPython
+What is MicroPython?
+Edit this on GitHub
+MicroPython is a full implementation of the Python 3 programming language that runs directly on embedded hardware like Raspberry Pi Pico. You get an interactive prompt (the REPL) to execute commands immediately via USB Serial, and a built-in filesystem. The Pico port of MicroPython includes modules for accessing low-level chip-specific hardware.
+-
+The MicroPython Wiki
+Drag-and-Drop MicroPython
+Edit this on GitHub
+You can program your Pico by connecting it to a computer via USB, then dragging and dropping a file onto it so we’ve put together a downloadable UF2 file to let you install MicroPython more easily.
+Download the correct MicroPython UF2 file for your board:
+For more information about using Wi-Fi and Bluetooth on Raspberry Pi Pico W-series devices with C/C++ or MicroPython, see Connecting to the Internet with Raspberry Pi Pico W-series.
+For more information about supported Bluetooth protocols and profiles, see the Blue Kitchen BTStack Github repository.
+|
+Note
+|
+MicroPython distributions for other RP2040- and RP2350-based boards are available on the MicroPython download page. |
+To program your device, follow these steps:
+-
+Push and hold the BOOTSEL button while connecting your Pico with a USB cable to a computer. Release the BOOTSEL button once your Pico appears as a Mass Storage Device called RPI-RP2.
+-
+Drag and drop the MicroPython UF2 file onto the RPI-RP2 volume. Your Pico will reboot. You are now running MicroPython.
+-
+Access the REPL via USB Serial.
+The Raspberry Pi Pico-series Python SDK book contains step-by-step instructions for connecting to your Pico and programming it in MicroPython using both the command line and the Thonny IDE.
+Where can I find documentation?
+Edit this on GitHub
+You can find information on the MicroPython port to RP2040 at;
+- Raspberry Pi Pico Python SDK
+-
+A MicroPython environment for RP2040 microcontrollers
+- Connecting to the Internet with Raspberry Pi Pico W
+-
+Getting Raspberry Pi Pico W online with C/C++ or MicroPython
+- RP2 Quick Reference
+-
+The official documentation around the RP2040 port of MicroPython
+- RP2 Library
+-
+The official documentation about the
+rp2
+module in MicroPython
+Which hardware am I running on?
+Edit this on GitHub
+There is no direct method for software written in MicroPython to discover whether it is running on a Raspberry Pi Pico or a Pico W by looking at the hardware. However, you can tell indirectly by looking to see if network functionality is included in your particular MicroPython firmware:
+import network
+if hasattr(network, "WLAN"):
+# the board has WLAN capabilities
+Alternatively, you can inspect the MicroPython firmware version to check whether it was compiled for Raspberry Pi Pico or for Pico W using the sys
+module.
+>>> import sys
+>>> sys.implementation
+(name='micropython', version=(1, 19, 1), _machine='Raspberry Pi Pico W with RP2040', _mpy=4102)
+If the 'Pico W' string is present and in sys.implementation._machine
+, your firmware was compiled for Pico W.

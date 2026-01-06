@@ -1,0 +1,2205 @@
+URL: https://www.raspberrypi.com/documentation/pico-sdk/runtime.html
+
+Runtime Infrastructure
+Libraries that are used to provide efficient implementation of certain language level and C library functions, as well as CMake INTERFACE libraries abstracting the compilation and link steps in the SDK
+Second stage boot loaders responsible for setting up external flash. |
+|
+Helper implementations for C11 atomics. |
+|
+Core types and macros for the Raspberry Pi Pico SDK. |
+|
+Binary info is intended for embedding machine readable information with the binary in FLASH. |
+|
+Access to functions and data in the bootrom. |
+|
+Optimized bit manipulation functions. |
+|
+non-code library controlling C++ related compile options |
+|
+Provides the necessary glue code required by the particular C/C++ runtime being used. |
+|
+Provides the default linker scripts and the program entry/exit point. |
+|
+Optimized 32 and 64 bit division functions accelerated by the RP2040 hardware divider. |
+|
+Optimized double-precision floating point functions. |
+|
+Optimized single-precision floating point functions. |
+|
+Optimized replacement implementations of the compiler built-in 64 bit multiplication. |
+|
+Multi-core safety for malloc, calloc and free. |
+|
+Provides optimized replacement implementations of the compiler built-in memcpy, memset and related functions. |
+|
+Macros and definitions (and functions when included by non assembly code) for the RP2 family device / architecture to provide a common abstraction over low level compiler / platform specifics. |
+|
+Compact replacement for printf by Marco Paland ([email protected]) |
+|
+Basic runtime support for running pre-main initializers provided by other libraries. |
+|
+Main runtime initialization functions required to set up the runtime environment before entering main. |
+|
+Customized stdio support allowing for input and output from UART, USB, semi-hosting etc. |
+|
+Experimental support for stdout using RAM semihosting . |
+|
+Support for stdin/stdout using UART . |
+|
+Support for stdin/stdout using SEGGER RTT . |
+|
+Support for stdin/stdout over USB serial (CDC) . |
+|
+Includes default information about the binary that can be displayed by picotool. |
+|
+Setup for link options for a standard SDK executable. |
+pico_atomic
+Helper implementations for C11 atomics.
+Detailed Description
+On RP2040 a spin lock is used as protection for all atomic operations, since there is no C library support.
+On RP2350 the C-library provides implementations for all 1-byte, 2-byte and 4-byte atomics using processor exclusive operations. This library provides a spin-lock protected version for arbitrary-sized atomics (including 64-bit).
+pico_base
+Core types and macros for the Raspberry Pi Pico SDK.
+Detailed Description
+This header is intended to be included by all source code as it includes configuration headers and overrides in the correct order
+This header may be included by assembly code
+Macros
+-
+#define pico_board_cmake_set(x, y)
+-
+#define pico_board_cmake_set_default(x, y)
+Enumerations
+enum pico_error_codes { PICO_OK = 0, PICO_ERROR_NONE = 0, PICO_ERROR_GENERIC = -1, PICO_ERROR_TIMEOUT = -2, PICO_ERROR_NO_DATA = -3, PICO_ERROR_NOT_PERMITTED = -4, PICO_ERROR_INVALID_ARG = -5, PICO_ERROR_IO = -6, PICO_ERROR_BADAUTH = -7, PICO_ERROR_CONNECT_FAILED = -8, PICO_ERROR_INSUFFICIENT_RESOURCES = -9, PICO_ERROR_INVALID_ADDRESS = -10, PICO_ERROR_BAD_ALIGNMENT = -11, PICO_ERROR_INVALID_STATE = -12, PICO_ERROR_BUFFER_TOO_SMALL = -13, PICO_ERROR_PRECONDITION_NOT_MET = -14, PICO_ERROR_MODIFIED_DATA = -15, PICO_ERROR_INVALID_DATA = -16, PICO_ERROR_NOT_FOUND = -17, PICO_ERROR_UNSUPPORTED_MODIFICATION = -18, PICO_ERROR_LOCK_REQUIRED = -19, PICO_ERROR_VERSION_MISMATCH = -20, PICO_ERROR_RESOURCE_IN_USE = -21 }
+-
+Common return codes from pico_sdk methods that return a status.
+Macro Definition Documentation
+pico_board_cmake_set
+#define pico_board_cmake_set(x, y)
+A marker used in board headers to specify a CMake variable and value that should be set in the CMake build when the board header is used.
+Based on the PICO_BOARD CMake variable, the build will scan the board header for pico_board_cmake_set(var, value)
+and set these variables very early in the build configuration process. This allows setting CMake variables like PICO_PLATFORM
+from the board header, and thus affecting, for example, the choice of compiler made by the build
+|
+Note
+|
+use of this macro will overwrite the CMake variable if it is already set this macro’s definition is empty as it is not intended to have any effect on actual compilation |
+pico_board_cmake_set_default
+#define pico_board_cmake_set_default(x, y)
+A marker used in board headers to specify a CMake variable and value that should be set in the CMake build when the board header is used, if that CMake variable has not already been set.
+Based on the PICO_BOARD CMake variable, the build will scan the board header for pico_board_cmake_set_default(var, value)
+and set these variables very early in the build configuration process. This allows setting CMake variables like PICO_PLATFORM
+from the board header, and thus affecting, for example, the choice of compiler made by the build
+|
+Note
+|
+use of this macro will not overwrite the CMake variable if it is already set this macro’s definition is empty as it is not intended to have any effect on actual compilation |
+Enumeration Type Documentation
+pico_error_codes
+enum pico_error_codes
+Common return codes from pico_sdk methods that return a status.
+All PICO_ERROR_
+values are negative so they can be returned from functions that also want to return a zero or positive value on success.
+Note these error codes may be returned via bootrom functions too.
+No error; the operation succeeded. |
+|
+No error; the operation succeeded. |
+|
+An unspecified error occurred. |
+|
+The function failed due to timeout. |
+|
+Attempt for example to read from an empty buffer/FIFO. |
+|
+Permission violation e.g. write to read-only flash partition, or security violation. |
+|
+Argument is outside of range of supported values`. |
+|
+An I/O error occurred. |
+|
+The authorization failed due to bad credentials. |
+|
+The connection failed. |
+|
+Dynamic allocation of resources failed. |
+|
+Address argument was out-of-bounds or was determined to be an address that the caller may not access. |
+|
+Address was mis-aligned (usually not on word boundary) |
+|
+Something happened or failed to happen in the past, and consequently we (currently) can’t service the request. |
+|
+A user-allocated buffer was too small to hold the result or working state of this function. |
+|
+The call failed because another function must be called first. |
+|
+Cached data was determined to be inconsistent with the actual version of the data. |
+|
+A data structure failed to validate. |
+|
+Attempted to access something that does not exist; or, a search failed. |
+|
+Write is impossible based on previous writes; e.g. attempted to clear an OTP bit. |
+|
+A required lock is not owned. |
+|
+A version mismatch occurred (e.g. trying to run PIO version 1 code on RP2040) |
+|
+The call could not proceed because the required resources were unavailable. |
+pico_binary_info
+Binary info is intended for embedding machine readable information with the binary in FLASH.
+Detailed Description
+Example uses include:
+-
+Program identification / information
+-
+Pin layouts
+-
+Included features
+-
+Identifying flash regions used as block devices/storage
+Macros
+-
+#define bi_decl(_decl) __bi_mark_enclosure _decl; __bi_decl(__bi_ptr_lineno_var_name, &__bi_lineno_var_name.core, ".binary_info.keep.", __used);
+-
+#define bi_decl_if_func_used(_decl) ({__bi_mark_enclosure _decl; __bi_decl(__bi_ptr_lineno_var_name, &__bi_lineno_var_name.core, ".binary_info.", ); *(const volatile uint8_t *)&__bi_ptr_lineno_var_name;});
+Macro Definition Documentation
+bi_decl
+#define bi_decl(_decl) __bi_mark_enclosure _decl; __bi_decl(__bi_ptr_lineno_var_name, &__bi_lineno_var_name.core, ".binary_info.keep.", __used);
+Declare some binary information that will be included if the contain source file/line is compiled into the binary.
+bi_decl_if_func_used
+#define bi_decl_if_func_used(_decl) ({__bi_mark_enclosure _decl; __bi_decl(__bi_ptr_lineno_var_name, &__bi_lineno_var_name.core, ".binary_info.", ); *(const volatile uint8_t *)&__bi_ptr_lineno_var_name;});
+Declare some binary information that will be included if the function containing the decl is linked into the binary. The SDK uses –gc-sections, so functions that are never called will be removed by the linker, and any associated binary information declared this way will also be stripped.
+pico_bootrom
+Access to functions and data in the bootrom.
+Macros
+-
+#define ROM_TABLE_CODE(c1, c2) ((c1) | ((c2) << 8))
+Functions
+static uint32_t rom_table_code (uint8_t c1, uint8_t c2)
+-
+Return a bootrom lookup code based on two ASCII characters.
+void * rom_func_lookup (uint32_t code)
+-
+Lookup a bootrom function by its code.
+void * rom_data_lookup (uint32_t code)
+-
+Lookup a bootrom data address by its code.
+bool rom_funcs_lookup (uint32_t *table, unsigned int count)
+-
+Helper function to lookup the addresses of multiple bootrom functions.
+static __force_inline void * rom_func_lookup_inline (uint32_t code)
+-
+Lookup a bootrom function by code. This method is forcibly inlined into the caller for FLASH/RAM sensitive code usage.
+static __force_inline void * rom_data_lookup_inline (uint32_t code)
+-
+Lookup a bootrom data address by its code. This method is forcibly inlined into the caller for FLASH/RAM sensitive code usage.
+void rom_reset_usb_boot (uint32_t usb_activity_gpio_pin_mask, uint32_t disable_interface_mask)
+-
+Reboot the device into BOOTSEL mode.
+void rom_reset_usb_boot_extra (int usb_activity_gpio_pin, uint32_t disable_interface_mask, bool usb_activity_gpio_pin_active_low)
+-
+Reboot the device into BOOTSEL mode.
+static void rom_connect_internal_flash (void)
+-
+Connect the SSI/QMI to the QSPI pads.
+static void rom_flash_exit_xip (void)
+-
+Return the QSPI device from its XIP state to a serial command state.
+static void rom_flash_range_erase (uint32_t addr, size_t count, uint32_t block_size, uint8_t block_cmd)
+-
+Erase bytes in flash.
+static void rom_flash_range_program (uint32_t addr, const uint8_t *data, size_t count)
+-
+Program bytes in flash.
+static void rom_flash_flush_cache (void)
+-
+Flush the XIP cache.
+static void rom_flash_enter_cmd_xip (void)
+-
+Configure the SSI/QMI with a standard command.
+-
+static int rom_reboot (uint32_t flags, uint32_t delay_ms, uint32_t p0, uint32_t p1)
+RP2350 -
+Reboot using the watchdog.
+-
+static void rom_bootrom_state_reset (uint32_t flags)
+RP2350 -
+Reset bootrom state.
+-
+static void rom_flash_reset_address_trans (void)
+RP2350 -
+Reset address translation.
+-
+static void rom_flash_select_xip_read_mode (bootrom_xip_mode_t mode, uint8_t clkdiv)
+RP2350 -
+Configure QMI in a XIP read mode.
+-
+static int rom_flash_op (cflash_flags_t flags, uintptr_t addr, uint32_t size_bytes, uint8_t *buf)
+RP2350 -
+Perform a flash read, erase, or program operation.
+-
+static int rom_func_otp_access (uint8_t *buf, uint32_t buf_len, otp_cmd_t cmd)
+RP2350 -
+Writes data from a buffer into OTP, or reads data from OTP into a buffer.
+-
+static int rom_get_partition_table_info (uint32_t *out_buffer, uint32_t out_buffer_word_size, uint32_t partition_and_flags)
+RP2350 -
+Fills a buffer with information from the partition table.
+-
+static int rom_load_partition_table (uint8_t *workarea_base, uint32_t workarea_size, bool force_reload)
+RP2350 -
+Loads the current partition table from flash, if present.
+-
+static int rom_pick_ab_partition (uint8_t *workarea_base, uint32_t workarea_size, uint partition_a_num, uint32_t flash_update_boot_window_base)
+RP2350 -
+Pick a partition from an A/B pair.
+-
+int rom_pick_ab_partition_during_update (uint32_t *workarea_base, uint32_t workarea_size, uint partition_a_num)
+RP2350 -
+Pick A/B partition without disturbing any in progress Flash Update boot or TBYB boot.
+-
+static int rom_get_b_partition (uint pi_a)
+RP2350 -
+Get B partition.
+-
+static int rom_get_uf2_target_partition (uint8_t *workarea_base, uint32_t workarea_size, uint32_t family_id, resident_partition_t *partition_out)
+RP2350 -
+Get UF2 Target Partition.
+-
+static intptr_t rom_flash_runtime_to_storage_addr (uintptr_t flash_runtime_addr)
+RP2350 -
+Translate runtime to storage address.
+-
+static int rom_chain_image (uint8_t *workarea_base, uint32_t workarea_size, uint32_t region_base, uint32_t region_size)
+RP2350 -
+Chain into a launchable image.
+-
+static int rom_explicit_buy (uint8_t *buffer, uint32_t buffer_size)
+RP2350 -
+Buy an image.
+-
+static int rom_set_ns_api_permission (uint ns_api_num, bool allowed)
+RP2350 -
+Set NS API Permission.
+-
+static void * rom_validate_ns_buffer (const void *addr, uint32_t size, uint32_t write, uint32_t *ok)
+RP2350 -
+Validate NS Buffer.
+-
+static intptr_t rom_set_rom_callback (uint callback_num, bootrom_api_callback_generic_t funcptr)
+RP2350 -
+Set ROM callback function.
+-
+static int rom_get_sys_info (uint32_t *out_buffer, uint32_t out_buffer_word_size, uint32_t flags)
+RP2350 -
+Get system information.
+-
+int rom_add_flash_runtime_partition (uint32_t start_offset, uint32_t size, uint32_t permissions)
+RP2350 -
+Add a runtime partition to the partition table to specify flash permissions.
+Macro Definition Documentation
+ROM_TABLE_CODE
+#define ROM_TABLE_CODE(c1, c2) ((c1) | ((c2) << 8))
+Return a bootrom lookup code based on two ASCII characters.
+These codes are uses to lookup data or function addresses in the bootrom
+Parameters
+c1
+|
+the first character |
+c2
+|
+the second character |
+Returns
+the 'code' to use in rom_func_lookup() or rom_data_lookup()
+Function Documentation
+rom_add_flash_runtime_partition RP2350
+int rom_add_flash_runtime_partition (uint32_t start_offset, uint32_t size, uint32_t permissions)
+Add a runtime partition to the partition table to specify flash permissions.
+Note that a partition is added to the runtime view of the partition table maintained by the bootrom if there is space to do so
+Note that these permissions cannot override the permissions for any pre-existing partitions, as permission matches are made on a first partition found basis.
+Parameters
+start_offset
+|
+the start_offset into flash in bytes (must be a multiple of 4K) |
+size
+|
+the size in byte (must be a multiple of 4K) |
+permissions
+|
+the bitwise OR of permissions from PICOBIN_PARTITION_PERMISSION_ constants, e.g. PICOBIN_PARTITION_PERMISSION_S_R_BITS from boot/picobin.h |
+Returns
+>= 0 the partition number added if PICO_ERROR_BAD_ALIGNMENT if the start_offset or size aren’t multiples of 4K. PICO_ERROR_INVALID_ARG if the start_offset or size are out of range, or invalid permission bits are set.
+rom_bootrom_state_reset RP2350
+static void rom_bootrom_state_reset (uint32_t flags) [inline], [static]
+Reset bootrom state.
+Resets internal bootrom state, based on the following flags:
+STATE_RESET_CURRENT_CORE - Resets any internal bootrom state for the current core into a clean state. This method should be called prior to calling any other bootrom APIs on the current core, and is called automatically by the bootrom during normal boot of core 0 and launch of code on core 1.
+STATE_RESET_OTHER_CORE - Resets any internal bootrom state for the other core into a clean state. This is generally called by a debugger when resetting the state of one core via code running on the other.
+STATE_RESET_GLOBAL_STATE - Resets all non core-specific state, including: Disables access to bootrom APIs from ARM-NS Unlocks all BOOT spinlocks Clears any secure code callbacks
+Note: the sdk calls this method on runtime initialisation to put the bootrom into a known state. This allows the program to function correctly if it is entered (e.g. from a debugger) without taking the usual boot path (which resets the state appropriately itself).
+Parameters
+flags
+|
+flags, as detailed above |
+rom_chain_image RP2350
+static int rom_chain_image (uint8_t * workarea_base, uint32_t workarea_size, uint32_t region_base, uint32_t region_size) [inline], [static]
+Chain into a launchable image.
+Searches a memory region for a launchable image, and executes it if possible.
+The region_base and region_size specify a word-aligned, word-multiple-sized area of RAM, XIP RAM or flash to search. The first 4 kiB of the region must contain the start of a Block Loop with an IMAGE_DEF. If the new image is launched, the call does not return otherwise an error is returned.
+The region_base is signed, as a negative value can be passed, which indicates that the (negated back to positive value) is both the region_base and the base of the "flash update" region.
+This method potentially requires similar complexity to the boot path in terms of picking amongst versions, checking signatures etc. As a result it requires a user provided memory buffer as a work area. The work area should be word aligned, and of sufficient size or BOOTROM_ERROR_INSUFFICIENT_RESOURCES will be returned. The work area size currently required is 3264, so 3.25K is a good choice.
+|
+Note
+|
+This method is primarily expected to be used when implementing bootloaders. |
+|
+Note
+|
+When chaining into an image, the OTP_DATA_BOOT_FLAGS0_ROLLBACK_REQUIRED flag will not be set, to prevent invalidating a bootloader without a rollback version by booting a binary which has one. |
+Parameters
+workarea_base
+|
+base address of work area |
+workarea_size
+|
+size of work area |
+region_base
+|
+base address of image |
+region_size
+|
+size of window containing image |
+rom_connect_internal_flash
+static void rom_connect_internal_flash (void) [inline], [static]
+Connect the SSI/QMI to the QSPI pads.
+Restore all QSPI pad controls to their default state, and connect the SSI/QMI peripheral to the QSPI pads.
+On RP2350 if a secondary flash chip select GPIO has been configured via OTP OTP_DATA_FLASH_DEVINFO, or by writing to the runtime copy of FLASH_DEVINFO in bootram, then this bank 0 GPIO is also initialised and the QMI peripheral is connected. Otherwise, bank 0 IOs are untouched.
+rom_data_lookup
+void * rom_data_lookup (uint32_t code)
+Lookup a bootrom data address by its code.
+Parameters
+code
+|
+the code |
+Returns
+a pointer to the data, or NULL if the code does not match any bootrom function
+rom_data_lookup_inline
+static __force_inline void * rom_data_lookup_inline (uint32_t code) [static]
+Lookup a bootrom data address by its code. This method is forcibly inlined into the caller for FLASH/RAM sensitive code usage.
+Parameters
+code
+|
+the code |
+Returns
+a pointer to the data, or NULL if the code does not match any bootrom data
+rom_explicit_buy RP2350
+static int rom_explicit_buy (uint8_t * buffer, uint32_t buffer_size) [inline], [static]
+Buy an image.
+Perform an "explicit" buy of an executable launched via an IMAGE_DEF which was "explicit buy" flagged. A "flash update" boot of such an image is a way to have the image execute once, but only become the "current" image if it calls back into the bootrom via this call.
+This call may perform the following:
+-
+Erase and rewrite the part of flash containing the "explicit buy" flag in order to clear said flag.
+-
+Erase the first sector of the other partition in an A/B partition scenario, if this new IMAGE_DEF is a version downgrade (so this image will boot again when not doing a "flash update" boot)
+-
+Update the rollback version in OTP if the chip is secure, and a rollback version is present in the image.
+|
+Note
+|
+The device may reboot while updating the rollback version, if multiple rollback rows need to be written - this occurs when the version crosses a multiple of 24 (for example upgrading from version 23 to 25 requires a reboot, but 23 to 24 or 24 to 25 doesn’t). The application should therefore be prepared to reboot when calling this function, if rollback versions are in use. |
+Note that the first of the above requires 4 kiB of scratch space, so you should pass a word aligned buffer of at least 4 kiB to this method, or it will return BOOTROM_ERROR_INSUFFICIENT_RESOURCES if the "explicit buy" flag needs to be cleared.
+Parameters
+buffer
+|
+base address of scratch space |
+buffer_size
+|
+size of scratch space |
+rom_flash_enter_cmd_xip
+static void rom_flash_enter_cmd_xip (void) [inline], [static]
+Configure the SSI/QMI with a standard command.
+Configure the SSI/QMI to generate a standard 03h serial read command, with 24 address bits, upon each XIP access. This is a slow XIP configuration, but is widely supported. CLKDIV is set to 12 on RP2350. The debugger may call this function to ensure that flash is readable following a program/erase operation.
+Note that the same setup is performed by flash_exit_xip(), and the RP2350 flash program/erase functions do not leave XIP in an inaccessible state, so calls to this function are largely redundant on RP2350. It is provided on RP2350 for compatibility with RP2040.
+rom_flash_exit_xip
+static void rom_flash_exit_xip (void) [inline], [static]
+Return the QSPI device from its XIP state to a serial command state.
+On RP2040, first set up the SSI for serial-mode operations, then issue the fixed XIP exit sequence described in Section 2.8.1.2 of the datasheet. Note that the bootrom code uses the IO forcing logic to drive the CS pin, which must be cleared before returning the SSI to XIP mode (e.g. by a call to _flash_flush_cache). This function configures the SSI with a fixed SCK clock divisor of /6.
+On RP2350, Initialise the QMI for serial operations (direct mode), and also initialise a basic XIP mode, where the QMI will perform 03h serial read commands at low speed (CLKDIV=12) in response to XIP reads.
+Then, issue a sequence to the QSPI device on chip select 0, designed to return it from continuous read mode ("XIP mode") and/or QPI mode to a state where it will accept serial commands. This is necessary after system reset to restore the QSPI device to a known state, because resetting RP2350 does not reset attached QSPI devices. It is also necessary when user code, having already performed some continuous-read-mode or QPI-mode accesses, wishes to return the QSPI device to a state where it will accept the serial erase and programming commands issued by the bootrom’s flash access functions.
+If a GPIO for the secondary chip select is configured via FLASH_DEVINFO, then the XIP exit sequence is also issued to chip select 1.
+The QSPI device should be accessible for XIP reads after calling this function; the name flash_exit_xip refers to returning the QSPI device from its XIP state to a serial command state.
+rom_flash_flush_cache
+static void rom_flash_flush_cache (void) [inline], [static]
+Flush the XIP cache.
+Flush and enable the XIP cache. Also clears the IO forcing on QSPI CSn, so that the SSI can drive the flash chip select as normal.
+Flush the entire XIP cache, by issuing an invalidate by set/way maintenance operation to every cache line. This ensures that flash program/erase operations are visible to subsequent cached XIP reads.
+Note that this unpins pinned cache lines, which may interfere with cache-as-SRAM use of the XIP cache.
+No other operations are performed.
+rom_flash_op RP2350
+static int rom_flash_op (cflash_flags_t flags, uintptr_t addr, uint32_t size_bytes, uint8_t * buf) [inline], [static]
+Perform a flash read, erase, or program operation.
+The flash operation is bounds-checked against the known flash devices specified by the runtime value of FLASH_DEVINFO, stored in bootram. This is initialised by the bootrom to the OTP value OTP_DATA_FLASH_DEVINFO, if OTP_DATA_BOOT_FLAGS0_FLASH_DEVINFO_ENABLE is set; otherwise it is initialised to 16 MiB for chip select 0 and 0 bytes for chip select 1. FLASH_DEVINFO can be updated at runtime by writing to its location in bootram, the pointer to which can be looked up in the ROM table.
+If a resident partition table is in effect, then the flash operation is also checked against the partition permissions. The Secure version of this function can specify the caller’s effective security level (Secure, Non-secure, bootloader) using the CFLASH_SECLEVEL_BITS bitfield of the flags argument, whereas the Non-secure function is always checked against the Non-secure permissions for the partition. Flash operations which span two partitions are not allowed, and will fail address validation.
+If OTP_DATA_FLASH_DEVINFO_D8H_ERASE_SUPPORTED is set, erase operations will use a D8h 64 kiB block erase command where possible (without erasing outside the specified region), for faster erase time. Otherwise, only 20h 4 kiB sector erase commands are used.
+Optionally, this API can translate addr from flash runtime addresses to flash storage addresses, according to the translation currently configured by QMI address translation registers, QMI_ATRANS0 through QMI_ATRANS7. For example, an image stored at a +2 MiB offset in flash (but mapped at XIP address 0 at runtime), writing to an offset of +1 MiB into the image, will write to a physical flash storage address of 3 MiB. Translation is enabled by setting the CFLASH_ASPACE_BITS bitfield in the flags argument.
+When translation is enabled, flash operations which cross address holes in the XIP runtime address space (created by non-maximum ATRANSx_SIZE) will return an error response. This check may tear: the transfer may be partially performed before encountering an address hole and ultimately returning failure.
+When translation is enabled, flash operations are permitted to cross chip select boundaries, provided this does not span an ATRANS address hole. When translation is disabled, the entire operation must target a single flash chip select (as determined by bits 24 and upward of the address), else address validation will fail.
+Parameters
+flags
+|
+controls the security level, address space, and flash operation |
+addr
+|
+the address of the first flash byte to be accessed, ranging from XIP_BASE to XIP_BASE + 0x1ffffff |
+size_bytes
+|
+size of buf, in bytes |
+buf
+|
+contains data to be written to flash, for program operations, and data read back from flash, for read operations |
+rom_flash_range_erase
+static void rom_flash_range_erase (uint32_t addr, size_t count, uint32_t block_size, uint8_t block_cmd) [inline], [static]
+Erase bytes in flash.
+Erase count bytes, starting at addr (offset from start of flash). Optionally, pass a block erase command e.g. D8h block erase, and the size of the block erased by this command - this function will use the larger block erase where possible, for much higher erase speed. addr must be aligned to a 4096-byte sector, and count must be a multiple of 4096 bytes.
+This is a low-level flash API, and no validation of the arguments is performed.
+See rom_flash_op on RP2350 for a higher-level API which checks alignment, flash bounds and partition permissions, and can transparently apply a runtime-to-storage address translation.
+The QSPI device must be in a serial command state before calling this API, which can be achieved by calling rom_connect_internal_flash() followed by rom_flash_exit_xip(). After the erase, the flash cache should be flushed via rom_flash_flush_cache() to ensure the modified flash data is visible to cached XIP accesses.
+Finally, the original XIP mode should be restored by copying the saved XIP setup function from bootram into SRAM, and executing it: the bootrom provides a default function which restores the flash mode/clkdiv discovered during flash scanning, and user programs can override this with their own XIP setup function.
+For the duration of the erase operation, QMI is in direct mode and attempting to access XIP from DMA, the debugger or the other core will return a bus fault. XIP becomes accessible again once the function returns.
+Parameters
+addr
+|
+the offset from start of flash to be erased |
+count
+|
+number of bytes to erase |
+block_size
+|
+optional size of block erased by block_cmd |
+block_cmd
+|
+optional block erase command e.g. D8h block erase |
+rom_flash_range_program
+static void rom_flash_range_program (uint32_t addr, const uint8_t * data, size_t count) [inline], [static]
+Program bytes in flash.
+Program data to a range of flash addresses starting at addr (offset from the start of flash) and count bytes in size. addr must be aligned to a 256-byte boundary, and count must be a multiple of 256.
+This is a low-level flash API, and no validation of the arguments is performed.
+See rom_flash_op on RP2350 for a higher-level API which checks alignment, flash bounds and partition permissions, and can transparently apply a runtime-to-storage address translation.
+The QSPI device must be in a serial command state before calling this API - see notes on rom_flash_range_erase
+Parameters
+addr
+|
+the offset from start of flash to be erased |
+data
+|
+buffer containing the data to be written |
+count
+|
+number of bytes to erase |
+rom_flash_reset_address_trans RP2350
+static void rom_flash_reset_address_trans (void) [inline], [static]
+Reset address translation.
+Restore the QMI address translation registers, QMI_ATRANS0 through QMI_ATRANS7, to their reset state. This makes the runtime-to-storage address map an identity map, i.e. the mapped and unmapped address are equal, and the entire space is fully mapped.
+rom_flash_runtime_to_storage_addr RP2350
+static intptr_t rom_flash_runtime_to_storage_addr (uintptr_t flash_runtime_addr) [inline], [static]
+Translate runtime to storage address.
+Applies the address translation currently configured by QMI address translation registers.
+Translating an address outside of the XIP runtime address window, or beyond the bounds of an ATRANSx_SIZE field, returns BOOTROM_ERROR_INVALID_ADDRESS, which is not a valid flash storage address. Otherwise, return the storage address which QMI would access when presented with the runtime address addr. This is effectively a virtual-to-physical address translation for QMI.
+Parameters
+flash_runtime_addr
+|
+the address to translate |
+rom_flash_select_xip_read_mode RP2350
+static void rom_flash_select_xip_read_mode (bootrom_xip_mode_t mode, uint8_t clkdiv) [inline], [static]
+Configure QMI in a XIP read mode.
+Configure QMI for one of a small menu of XIP read modes supported by the bootrom. This mode is configured for both memory windows (both chip selects), and the clock divisor is also applied to direct mode.
+Parameters
+mode
+|
+bootrom_xip_mode_t mode to use |
+clkdiv
+|
+clock divider |
+rom_func_lookup
+void * rom_func_lookup (uint32_t code)
+Lookup a bootrom function by its code.
+Parameters
+code
+|
+the code |
+Returns
+a pointer to the function, or NULL if the code does not match any bootrom function
+rom_func_lookup_inline
+static __force_inline void * rom_func_lookup_inline (uint32_t code) [static]
+Lookup a bootrom function by code. This method is forcibly inlined into the caller for FLASH/RAM sensitive code usage.
+Parameters
+code
+|
+the code |
+Returns
+a pointer to the function, or NULL if the code does not match any bootrom function
+rom_func_otp_access RP2350
+static int rom_func_otp_access (uint8_t * buf, uint32_t buf_len, otp_cmd_t cmd) [inline], [static]
+Writes data from a buffer into OTP, or reads data from OTP into a buffer.
+The buffer must be aligned to 2 bytes or 4 bytes according to the IS_ECC flag.
+This method will read and write rows until the first row it encounters that fails a key or permission check at which it will return BOOTROM_ERROR_NOT_PERMITTED.
+Writing will also stop at the first row where an attempt is made to set an OTP bit from a 1 to a 0, and BOOTROM_ERROR_UNSUPPORTED_MODIFICATION will be returned.
+If all rows are read/written successfully, then BOOTROM_OK will be returned.
+Parameters
+buf
+|
+buffer to read to/write from |
+buf_len
+|
+size of buf |
+cmd
+|
+OTP command to execute
+|
+rom_funcs_lookup
+bool rom_funcs_lookup (uint32_t * table, unsigned int count)
+Helper function to lookup the addresses of multiple bootrom functions.
+This method looks up the 'codes' in the table, and convert each table entry to the looked up function pointer, if there is a function for that code in the bootrom.
+Parameters
+table
+|
+an IN/OUT array, elements are codes on input, function pointers on success. |
+count
+|
+the number of elements in the table |
+Returns
+true if all the codes were found, and converted to function pointers, false otherwise
+rom_get_b_partition RP2350
+static int rom_get_b_partition (uint pi_a) [inline], [static]
+Get B partition.
+Returns the index of the B partition of partition A if a partition table is present and loaded, and there is a partition A with a B partition; otherwise returns BOOTROM_ERROR_NOT_FOUND.
+Parameters
+pi_a
+|
+the A partition number |
+rom_get_partition_table_info RP2350
+static int rom_get_partition_table_info (uint32_t * out_buffer, uint32_t out_buffer_word_size, uint32_t partition_and_flags) [inline], [static]
+Fills a buffer with information from the partition table.
+Fills a buffer with information from the partition table. Note that this API is also used to return information over the picoboot interface.
+On success, the buffer is filled, and the number of words filled in the buffer is returned. If the partition table has not been loaded (e.g. from a watchdog or RAM boot), then this method will return BOOTROM_ERROR_NO_DATA, and you should load the partition table via load_partition_table() first.
+Note that not all data from the partition table is kept resident in memory by the bootrom due to size constraints. To protect against changes being made in flash after the bootrom has loaded the resident portion, the bootrom keeps a hash of the partition table as of the time it loaded it. If the hash has changed by the time this method is called, then it will return BOOTROM_ERROR_INVALID_STATE.
+The information returned is chosen by the partition_and_flags parameter; the first word in the returned buffer, is the (sub)set of those flags that the API supports. You should always check this value before interpreting the buffer.
+Following the first word, returns words of data for each present flag in order. With the exception of PT_INFO, all the flags select "per partition" information, so each field is returned in flag order for one partition after the next. The special SINGLE_PARTITION flag indicates that data for only a single partition is required.
+Parameters
+out_buffer
+|
+buffer to write data to |
+out_buffer_word_size
+|
+size of out_buffer, in words |
+partition_and_flags
+|
+partition number and flags |
+rom_get_sys_info RP2350
+static int rom_get_sys_info (uint32_t * out_buffer, uint32_t out_buffer_word_size, uint32_t flags) [inline], [static]
+Get system information.
+Fills a buffer with various system information. Note that this API is also used to return information over the picoboot interface.
+On success, the buffer is filled, and the number of words filled in the buffer is returned.
+The information returned is chosen by the flags parameter; the first word in the returned buffer, is the (sub)set of those flags that the API supports. You should always check this value before interpreting the buffer.
+"Boot Diagnostic" information is intended to help identify the cause of a failed boot, or booting into an unexpected binary. This information can be retrieved via picoboot after a watchdog reboot, however it will not survive a reset via the RUN pin or POWMAN reset.
+There is only one word of diagnostic information. What it records is based on the pp selection above, which is itself set as a parameter when rebooting programmatically into a normal boot.
+To get diagnostic info, pp must refer to a slot or an "A" partition; image diagnostics are automatically selected on boot from OTP or RAM image, or when chain_image() is called.)
+The diagnostic word thus contains data for either slot 0 and slot 1, or the "A" partition (and its "B" partition if it has one). The low half word of the diagnostic word contains information from slot 0 or partition A; the high half word contains information from slot 1 or partition B.
+To get a full picture of a failed boot involving slots and multiple partitions, the device can be rebooted multiple times to gather the information.
+Parameters
+out_buffer
+|
+buffer to write data to |
+out_buffer_word_size
+|
+size of out_buffer, in words |
+flags
+|
+flags |
+rom_get_uf2_target_partition RP2350
+static int rom_get_uf2_target_partition (uint8_t * workarea_base, uint32_t workarea_size, uint32_t family_id, resident_partition_t * partition_out) [inline], [static]
+Get UF2 Target Partition.
+This method performs the same operation to decide on a target partition for a UF2 family ID as when a UF2 is dragged onto the USB drive in BOOTSEL mode.
+This method potentially requires similar complexity to the boot path in terms of picking amongst versions, checking signatures etc. As a result it requires a user provided memory buffer as a work area. The work area should byte word-aligned and of sufficient size or BOOTROM_ERROR_INSUFFICIENT_RESOURCES
+will be returned. The work area size currently required is 3264, so 3.25K is a good choice.
+If the partition table has not been loaded (e.g. from a watchdog or RAM boot), then this method will return BOOTROM_ERROR_PRECONDITION_NOT_MET
+, and you should load the partition table via load_partition_table() first.
+Parameters
+workarea_base
+|
+base address of work area |
+workarea_size
+|
+size of work area |
+family_id
+|
+the family ID to place |
+partition_out
+|
+pointer to the resident_partition_t to fill with the partition data |
+rom_load_partition_table RP2350
+static int rom_load_partition_table (uint8_t * workarea_base, uint32_t workarea_size, bool force_reload) [inline], [static]
+Loads the current partition table from flash, if present.
+This method potentially requires similar complexity to the boot path in terms of picking amongst versions, checking signatures etc. As a result it requires a user provided memory buffer as a work area. The work area should byte word-aligned and of sufficient size or BOOTROM_ERROR_INSUFFICIENT_RESOURCES will be returned. The work area size currently required is 3264, so 3.25K is a good choice.
+If force_reload is false, then this method will return BOOTROM_OK immediately if the bootrom is loaded, otherwise it will reload the partition table if it has been loaded already, allowing for the partition table to be updated in a running program.
+Parameters
+workarea_base
+|
+base address of work area |
+workarea_size
+|
+size of work area |
+force_reload
+|
+force reloading of the partition table |
+rom_pick_ab_partition RP2350
+static int rom_pick_ab_partition (uint8_t * workarea_base, uint32_t workarea_size, uint partition_a_num, uint32_t flash_update_boot_window_base) [inline], [static]
+Pick a partition from an A/B pair.
+Determines which of the partitions has the "better" IMAGE_DEF. In the case of executable images, this is the one that would be booted
+This method potentially requires similar complexity to the boot path in terms of picking amongst versions, checking signatures etc. As a result it requires a user provided memory buffer as a work area. The work area should bye word aligned, and of sufficient size or BOOTROM_ERROR_INSUFFICIENT_RESOURCES will be returned. The work area size currently required is 3264, so 3.25K is a good choice.
+The passed partition number can be any valid partition number other than the "B" partition of an A/B pair.
+This method returns a negative error code, or the partition number of the picked partition if (i.e. partition_a_num or the number of its "B" partition if any).
+|
+Note
+|
+This method does not look at owner partitions, only the A partition passed and it’s corresponding B partition. |
+|
+Note
+|
+You should not call this method directly when performing a Flash Update Boot before calling explicit_buy , as it may prevent any version downgrade from occuring - instead see rom_pick_ab_partition_during_update() which wraps this function.
+|
+Parameters
+workarea_base
+|
+base address of work area |
+workarea_size
+|
+size of work area |
+partition_a_num
+|
+the A partition of the pair |
+flash_update_boot_window_base
+|
+the flash update base, to pick that partition instead of the normally "better" partition |
+Returns
+>= 0 the chosen partition number out of the A/B pair
+rom_pick_ab_partition_during_update RP2350
+int rom_pick_ab_partition_during_update (uint32_t * workarea_base, uint32_t workarea_size, uint partition_a_num)
+Pick A/B partition without disturbing any in progress Flash Update boot or TBYB boot.
+This will perform the same function as rom_pick_ab_partition(), using the flash_update_boot_window_base
+from the current boot, while performing extra checks to prevent disrupting a main image TBYB boot. It requires the same minimum workarea size as rom_pick_ab_partition().
+This should be used instead of rom_pick_ab_partition() when performing a Flash Update Boot before calling rom_explicit_buy(), and can still be used without issue when a Flash Update Boot is not in progress.
+This function is necessary because if an explicit_buy
+is pending then calling pick_ab_partition
+would clear the saved flash erase address for the version downgrade, so the required erase of the other partition would not occur when explicit_buy
+is called. This function saves and restores that address to prevent this issue, and returns BOOTROM_ERROR_NOT_PERMITTED
+if the partition chosen by pick_ab_partition
+also requires a flash erase version downgrade (as you can’t erase two partitions with one explicit_buy
+call).
+This function also checks that the chosen partition contained a valid image (e.g. a signed image when using secure boot), and returns BOOTROM_ERROR_NOT_FOUND
+if it does not.
+Parameters
+workarea_base
+|
+base address of work area |
+workarea_size
+|
+size of work area |
+partition_a_num
+|
+the A partition of the pair |
+Returns
+>= 0 the partition number picked by rom_pick_ab_partition() BOOTROM_ERROR_NOT_PERMITTED if not possible to do an update correctly, e.g. if both main image and data image are TBYB BOOTROM_ERROR_NOT_FOUND if the chosen partition failed verification
+rom_reboot RP2350
+static int rom_reboot (uint32_t flags, uint32_t delay_ms, uint32_t p0, uint32_t p1) [inline], [static]
+Reboot using the watchdog.
+Resets the chip and uses the watchdog facility to restart.
+The delay_ms is the millisecond delay before the reboot occurs. Note: by default this method is asynchronous (unless NO_RETURN_ON_SUCCESS is set - see below), so the method will return and the reboot will happen this many milliseconds later.
+The flags field contains one of the following values:
+REBOOT_TYPE_NORMAL - reboot into the normal boot path.
+REBOOT_TYPE_BOOTSEL - reboot into BOOTSEL mode. p0 - the GPIO number to use as an activity indicator (enabled by flag in p1). p1 - a set of flags: 0x01 : DISABLE_MSD_INTERFACE - Disable the BOOTSEL USB drive (see [section_bootrom_mass_storage]) 0x02 : DISABLE_PICOBOOT_INTERFACE - Disable the {picoboot} interface (see [section_bootrom_picoboot]). 0x10 : GPIO_PIN_ACTIVE_LOW - The GPIO in p0 is active low. 0x20 : GPIO_PIN_ENABLED - Enable the activity indicator on the specified GPIO.
+REBOOT_TYPE_RAM_IMAGE - reboot into an image in RAM. The region of RAM or XIP RAM is searched for an image to run. This is the type of reboot used when a RAM UF2 is dragged onto the BOOTSEL USB drive. p0 - the region start address (word-aligned). p1 - the region size (word-aligned).
+REBOOT_TYPE_FLASH_UPDATE - variant of REBOOT_TYPE_NORMAL to use when flash has been updated. This is the type of reboot used after dragging a flash UF2 onto the BOOTSEL USB drive. p0 - the address of the start of the region of flash that was updated. If this address matches the start address of a partition or slot, then that partition or slot is treated preferentially during boot (when there is a choice). This type of boot facilitates TBYB and version downgrades.
+REBOOT_TYPE_PC_SP - reboot to a specific PC and SP. Note: this is not allowed in the ARM-NS variant. p0 - the initial program counter (PC) to start executing at. This must have the lowest bit set for Arm and clear for RISC-V p1 - the initial stack pointer (SP).
+All of the above, can have optional flags ORed in:
+REBOOT_TO_ARM - switch both cores to the Arm architecture (rather than leaving them as is). The call will fail with BOOTROM_ERROR_INVALID_STATE if the Arm architecture is not supported. REBOOT_TO_RISCV - switch both cores to the RISC-V architecture (rather than leaving them as is). The call will fail with BOOTROM_ERROR_INVALID_STATE if the RISC-V architecture is not supported. NO_RETURN_ON_SUCCESS - the watchdog h/w is asynchronous. Setting this bit forces this method not to return if the reboot is successfully initiated.
+Parameters
+flags
+|
+the reboot flags, as detailed above |
+delay_ms
+|
+millisecond delay before the reboot occurs |
+p0
+|
+parameter 0, depends on flags |
+p1
+|
+parameter 1, depends on flags |
+rom_reset_usb_boot
+void rom_reset_usb_boot (uint32_t usb_activity_gpio_pin_mask, uint32_t disable_interface_mask)
+Reboot the device into BOOTSEL mode.
+This function reboots the device into the BOOTSEL mode ('usb boot"). Facilities are provided to enable an "activity light" via GPIO attached LED for the USB Mass Storage Device, and to limit the USB interfaces exposed.
+Parameters
+usb_activity_gpio_pin_mask
+|
+0 No pins are used as per a cold boot. Otherwise a single bit set indicating which GPIO pin should be set to output and raised whenever there is mass storage activity from the host. |
+disable_interface_mask
+|
+value to control exposed interfaces
+|
+rom_reset_usb_boot_extra
+void rom_reset_usb_boot_extra (int usb_activity_gpio_pin, uint32_t disable_interface_mask, bool usb_activity_gpio_pin_active_low)
+Reboot the device into BOOTSEL mode.
+This function reboots the device into the BOOTSEL mode ('usb boot"). Facilities are provided to enable an "activity light" via GPIO attached LED for the USB Mass Storage Device, and to limit the USB interfaces exposed.
+Parameters
+usb_activity_gpio_pin
+|
+GPIO pin to be used as an activitiy pin, or -1 for none from the host. |
+disable_interface_mask
+|
+value to control exposed interfaces
+|
+usb_activity_gpio_pin_active_low
+|
+Activity GPIO is active low (ignored on RP2040) |
+rom_set_ns_api_permission RP2350
+static int rom_set_ns_api_permission (uint ns_api_num, bool allowed) [inline], [static]
+Set NS API Permission.
+Allow or disallow the specific NS API (note all NS APIs default to disabled).
+ns_api_num configures ARM-NS access to the given API. When an NS API is disabled, calling it will return BOOTROM_ERROR_NOT_PERMITTED.
+|
+Note
+|
+All permissions default to disallowed after a reset. |
+Parameters
+ns_api_num
+|
+ns api number |
+allowed
+|
+permission |
+rom_set_rom_callback RP2350
+static intptr_t rom_set_rom_callback (uint callback_num, bootrom_api_callback_generic_t funcptr) [inline], [static]
+Set ROM callback function.
+The only currently supported callback_number is 0 which sets the callback used for the secure_call API.
+A callback pointer of 0 deletes the callback function, a positive callback pointer (all valid function pointers are on RP2350) sets the callback function, but a negative callback pointer can be passed to get the old value without setting a new value.
+If successful, returns >=0 (the existing value of the function pointer on entry to the function).
+Parameters
+callback_num
+|
+the callback number to set - only 0 is supported on RP2350 |
+funcptr
+|
+pointer to the callback function |
+rom_table_code
+static uint32_t rom_table_code (uint8_t c1, uint8_t c2) [inline], [static]
+Return a bootrom lookup code based on two ASCII characters.
+These codes are uses to lookup data or function addresses in the bootrom
+Parameters
+c1
+|
+the first character |
+c2
+|
+the second character |
+Returns
+the 'code' to use in rom_func_lookup() or rom_data_lookup()
+rom_validate_ns_buffer RP2350
+static void * rom_validate_ns_buffer (const void * addr, uint32_t size, uint32_t write, uint32_t * ok) [inline], [static]
+Validate NS Buffer.
+Utility method that can be used by secure ARM code to validate a buffer passed to it from Non-secure code.
+Both the write parameter and the (out) result parameter ok are RCP booleans, so 0xa500a500 for true, and 0x00c300c3 for false. This enables hardening of this function, and indeed the write parameter must be one of these values or the RCP will hang the system.
+For success, the entire buffer must fit in range XIP_BASE -> SRAM_END, and must be accessible by the Non-secure caller according to SAU + NS MPU (privileged or not based on current processor IPSR and NS CONTROL flag). Buffers in USB RAM are also allowed if access is granted to NS via ACCESSCTRL.
+Parameters
+addr
+|
+buffer address |
+size
+|
+buffer size |
+write
+|
+rcp boolean, true if writeable |
+ok
+|
+rcp boolean result |
+pico_bit_ops
+Optimized bit manipulation functions.
+Detailed Description
+Additionally provides replacement implementations of the compiler built-ins __builtin_popcount, __builtin_clz and __bulitin_ctz
+pico_clib_interface
+Provides the necessary glue code required by the particular C/C++ runtime being used.
+pico_divider
+Optimized 32 and 64 bit division functions accelerated by the RP2040 hardware divider.
+Functions
+int32_t div_s32s32 (int32_t a, int32_t b)
+-
+Integer divide of two signed 32-bit values.
+static int32_t divmod_s32s32_rem (int32_t a, int32_t b, int32_t *rem)
+-
+Integer divide of two signed 32-bit values, with remainder.
+divmod_result_t divmod_s32s32 (int32_t a, int32_t b)
+-
+Integer divide of two signed 32-bit values.
+uint32_t div_u32u32 (uint32_t a, uint32_t b)
+-
+Integer divide of two unsigned 32-bit values.
+static uint32_t divmod_u32u32_rem (uint32_t a, uint32_t b, uint32_t *rem)
+-
+Integer divide of two unsigned 32-bit values, with remainder.
+divmod_result_t divmod_u32u32 (uint32_t a, uint32_t b)
+-
+Integer divide of two unsigned 32-bit values.
+int64_t div_s64s64 (int64_t a, int64_t b)
+-
+Integer divide of two signed 64-bit values.
+int64_t divmod_s64s64_rem (int64_t a, int64_t b, int64_t *rem)
+-
+Integer divide of two signed 64-bit values, with remainder.
+int64_t divmod_s64s64 (int64_t a, int64_t b)
+-
+Integer divide of two signed 64-bit values.
+uint64_t div_u64u64 (uint64_t a, uint64_t b)
+-
+Integer divide of two unsigned 64-bit values.
+uint64_t divmod_u64u64_rem (uint64_t a, uint64_t b, uint64_t *rem)
+-
+Integer divide of two unsigned 64-bit values, with remainder.
+uint64_t divmod_u64u64 (uint64_t a, uint64_t b)
+-
+Integer divide of two signed 64-bit values.
+int32_t div_s32s32_unsafe (int32_t a, int32_t b)
+-
+Unsafe integer divide of two signed 32-bit values.
+int32_t divmod_s32s32_rem_unsafe (int32_t a, int32_t b, int32_t *rem)
+-
+Unsafe integer divide of two signed 32-bit values, with remainder.
+divmod_result_t divmod_s32s32_unsafe (int32_t a, int32_t b)
+-
+Unsafe integer divide of two unsigned 32-bit values.
+uint32_t div_u32u32_unsafe (uint32_t a, uint32_t b)
+-
+Unsafe integer divide of two unsigned 32-bit values.
+uint32_t divmod_u32u32_rem_unsafe (uint32_t a, uint32_t b, uint32_t *rem)
+-
+Unsafe integer divide of two unsigned 32-bit values, with remainder.
+divmod_result_t divmod_u32u32_unsafe (uint32_t a, uint32_t b)
+-
+Unsafe integer divide of two unsigned 32-bit values.
+int64_t div_s64s64_unsafe (int64_t a, int64_t b)
+-
+Unsafe integer divide of two signed 64-bit values.
+int64_t divmod_s64s64_rem_unsafe (int64_t a, int64_t b, int64_t *rem)
+-
+Unsafe integer divide of two signed 64-bit values, with remainder.
+int64_t divmod_s64s64_unsafe (int64_t a, int64_t b)
+-
+Unsafe integer divide of two signed 64-bit values.
+uint64_t div_u64u64_unsafe (uint64_t a, uint64_t b)
+-
+Unsafe integer divide of two unsigned 64-bit values.
+uint64_t divmod_u64u64_rem_unsafe (uint64_t a, uint64_t b, uint64_t *rem)
+-
+Unsafe integer divide of two unsigned 64-bit values, with remainder.
+uint64_t divmod_u64u64_unsafe (uint64_t a, uint64_t b)
+-
+Unsafe integer divide of two signed 64-bit values.
+Function Documentation
+div_s32s32
+int32_t div_s32s32 (int32_t a, int32_t b)
+Integer divide of two signed 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient
+div_s32s32_unsafe
+int32_t div_s32s32_unsafe (int32_t a, int32_t b)
+Unsafe integer divide of two signed 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient
+Do not use in interrupts
+div_s64s64
+int64_t div_s64s64 (int64_t a, int64_t b)
+Integer divide of two signed 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+Quotient
+div_s64s64_unsafe
+int64_t div_s64s64_unsafe (int64_t a, int64_t b)
+Unsafe integer divide of two signed 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+Quotient
+Do not use in interrupts
+div_u32u32
+uint32_t div_u32u32 (uint32_t a, uint32_t b)
+Integer divide of two unsigned 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+Quotient
+div_u32u32_unsafe
+uint32_t div_u32u32_unsafe (uint32_t a, uint32_t b)
+Unsafe integer divide of two unsigned 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+Quotient
+Do not use in interrupts
+div_u64u64
+uint64_t div_u64u64 (uint64_t a, uint64_t b)
+Integer divide of two unsigned 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+Quotient
+div_u64u64_unsafe
+uint64_t div_u64u64_unsafe (uint64_t a, uint64_t b)
+Unsafe integer divide of two unsigned 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+Quotient
+Do not use in interrupts
+divmod_s32s32
+divmod_result_t divmod_s32s32 (int32_t a, int32_t b)
+Integer divide of two signed 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in low word/r0, remainder in high word/r1
+divmod_s32s32_rem
+static int32_t divmod_s32s32_rem (int32_t a, int32_t b, int32_t * rem) [inline], [static]
+Integer divide of two signed 32-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+divmod_s32s32_rem_unsafe
+int32_t divmod_s32s32_rem_unsafe (int32_t a, int32_t b, int32_t * rem)
+Unsafe integer divide of two signed 32-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+Do not use in interrupts
+divmod_s32s32_unsafe
+divmod_result_t divmod_s32s32_unsafe (int32_t a, int32_t b)
+Unsafe integer divide of two unsigned 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in low word/r0, remainder in high word/r1
+Do not use in interrupts
+divmod_s64s64
+int64_t divmod_s64s64 (int64_t a, int64_t b)
+Integer divide of two signed 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in result (r0,r1), remainder in regs (r2, r3)
+divmod_s64s64_rem
+int64_t divmod_s64s64_rem (int64_t a, int64_t b, int64_t * rem)
+Integer divide of two signed 64-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+divmod_s64s64_rem_unsafe
+int64_t divmod_s64s64_rem_unsafe (int64_t a, int64_t b, int64_t * rem)
+Unsafe integer divide of two signed 64-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+Do not use in interrupts
+divmod_s64s64_unsafe
+int64_t divmod_s64s64_unsafe (int64_t a, int64_t b)
+Unsafe integer divide of two signed 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in result (r0,r1), remainder in regs (r2, r3)
+Do not use in interrupts
+divmod_u32u32
+divmod_result_t divmod_u32u32 (uint32_t a, uint32_t b)
+Integer divide of two unsigned 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in low word/r0, remainder in high word/r1
+divmod_u32u32_rem
+static uint32_t divmod_u32u32_rem (uint32_t a, uint32_t b, uint32_t * rem) [inline], [static]
+Integer divide of two unsigned 32-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+divmod_u32u32_rem_unsafe
+uint32_t divmod_u32u32_rem_unsafe (uint32_t a, uint32_t b, uint32_t * rem)
+Unsafe integer divide of two unsigned 32-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+Do not use in interrupts
+divmod_u32u32_unsafe
+divmod_result_t divmod_u32u32_unsafe (uint32_t a, uint32_t b)
+Unsafe integer divide of two unsigned 32-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in low word/r0, remainder in high word/r1
+Do not use in interrupts
+divmod_u64u64
+uint64_t divmod_u64u64 (uint64_t a, uint64_t b)
+Integer divide of two signed 64-bit values.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+Returns
+quotient in result (r0,r1), remainder in regs (r2, r3)
+divmod_u64u64_rem
+uint64_t divmod_u64u64_rem (uint64_t a, uint64_t b, uint64_t * rem)
+Integer divide of two unsigned 64-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+divmod_u64u64_rem_unsafe
+uint64_t divmod_u64u64_rem_unsafe (uint64_t a, uint64_t b, uint64_t * rem)
+Unsafe integer divide of two unsigned 64-bit values, with remainder.
+Parameters
+a
+|
+Dividend |
+b
+|
+Divisor |
+rem
+|
+The remainder of dividend/divisor |
+Returns
+Quotient result of dividend/divisor
+Do not use in interrupts
+pico_double
+Optimized double-precision floating point functions.
+Detailed Description
+An application can take control of the floating point routines used in the application over and above what is provided by the compiler, by depending on the pico_double library. A user might want to do this:
+-
+To use optimized software implementations provided by the RP2-series device’s bootrom or the SDK
+-
+To use optimized combined software/hardware implementations utilizing custom RP2-series hardware for acceleration
+-
+To control the amount of C compiler/library code bloat
+-
+To make sure no floating point is called at all
+The pico_double library comes in three main flavors:
+-
+pico_double_none
+- all floating point operations cause a panic - no double-precision floating point code is included -
+pico_double_compiler
+- no custom functions are provided; all double-precision floating point is handled by the C compiler/library -
+pico_double_pico
+- the smallest and fastest available for the platform, along with additional functionality (e.g. fixed point conversions) which are detailed below
+The user can control which version they want (e.g. pico_double_xxx by either setting the CMake global variable PICO_DEFAULT_DOUBLE_IMPL=xxx
+, or by using the CMake function pico_set_double_implementation(<TARGET> xxx)
+. Note that in the absence of either, pico_double_pico is used by default.
+On RP2040, pico_double_pico
+uses optimized hand coded implementations from the bootrom and the SDK for both basic double-precision floating point operations and floating point math library functions. These implementations are generally faster and smaller than those provided by the C compiler/library, though they don’t support all the features of a fully compliant floating point implementation; they are however usually fine for the majority of cases
+On RP2350, pico_double_pico
+uses RP2350 DCP instructions (double co-processor) to implement fast version of the basic arithmetic functions, and provides optimized M33 implementations of trignometric and scientific functions. These implementations are generally faster and smaller than those provided by the C compiler/library, though they don’t support all the features of a fully compliant floating point implementation; they are however usually fine for the majority of cases
+On Arm, (replacement) optimized implementations are provided for the following compiler built-ins and math library functions when using pico_double_pico
+:
+-
+basic arithmetic:
+__aeabi_dadd, __aeabi_ddiv, __aeabi_dmul, __aeabi_drsub, __aeabi_dsub
+-
+comparison:
+__aeabi_cfcmpeq, __aeabi_cfrcmple, __aeabi_cfcmple, __aeabi_dcmpeq, __aeabi_dcmplt, __aeabi_dcmple, __aeabi_dcmpge, __aeabi_dcmpgt, __aeabi_dcmpun
+-
+(u)int32 ←> double:
+__aeabi_i2d, __aeabi_ui2d, __aeabi_d2iz, __aeabi_d2uiz
+-
+(u)int64 ←> double:
+__aeabi_l2d, __aeabi_ul2d, __aeabi_d2lz, __aeabi_d2ulz
+-
+double -> float:
+__aeabi_d2d
+-
+basic trigonometric:
+sqrt, cos, sin, tan, atan2, exp, log
+-
+trigonometric and scientific
+ldexp, copysign, trunc, floor, ceil, round, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh, exp2, log2, exp10, log10, pow, hypot, cbrt, fmod, drem, remainder, remquo, expm1, log1p, fma
+-
+GNU exetnsions:
+powint, sincos
+On Arm, the following additional optimized functions are also provided when using pico_double_pico
+:
+-
+Conversions to/from integer types:
+-
+(u)int -> double (round to nearest):
+int2double, uint2double, int642double, uint642double
+-
+(u)double -> int (round towards zero):
+double2int_z, double2uint_z, double2int64_z, double2uint64_z
+-
+(u)double -> int (round towards -infinity):
+double2int, double2uint, double2int64, double2uint64
+-
+-
+Conversions to/from fixed point integers:
+-
+(u)fix -> double (round to nearest):
+fix2double, ufix2double, fix642double, ufix642double
+-
+double -> (u)fix (round towards zero):
+double2fix_z, double2ufix_z, double2fix64_z, double2ufix64_z
+-
+double -> (u)fix (round towards -infinity):
+double2fix, double2ufix, double2fix64, double2ufix64
+-
+-
+Even faster versions of divide and square-root functions that do not round correctly:
+ddiv_fast, sqrt_fast (these do not round correctly)
+-
+Faster unfused multiply and accumulate:
+mla (fast fma)
+On RISC-V there is no custom double-precision floating point support, so pico_double_pico
+is equivalent to pico_double_compiler
+pico_float
+Optimized single-precision floating point functions.
+Detailed Description
+An application can take control of the floating point routines used in the application over and above what is provided by the compiler, by depending on the pico_float library. A user might want to do this
+-
+To use optimized software implementations provided by the RP2-series device’s bootrom or the SDK
+-
+To use optimized combined software/hardware implementations utilizing custom RP2-series hardware for acceleration
+-
+To control the amount of C compiler/library code bloat
+-
+To make sure no floating point is called at all
+The pico_float library comes in three main flavors:
+-
+pico_float_none
+- all floating point operations cause a panic - no single-precision floating point code is included -
+pico_float_compiler
+- no custom functions are provided; all single-precision floating point is handled by the C compiler/library -
+pico_float_pico
+- the smallest and fastest available for the platform, along with additional functionality (e.g. fixed point conversions) which are detailed below
+The user can control which version they want (e.g. pico_float_xxx by either setting the CMake global variable PICO_DEFAULT_FLOAT_IMPL=xxx
+, or by using the CMake function pico_set_float_implementation(<TARGET> xxx)
+. Note that in the absence of either, pico_float_pico is used by default.
+On RP2040, pico_float_pico
+uses optimized hand coded implementations from the bootrom and the SDK for both basic single-precision floating point operations and floating point math library functions. These implementations are generally faster and smaller than those provided by the C compiler/library, though they don’t support all the features of a fully compliant floating point implementation; they are however usually fine for the majority of cases
+On Arm on RP2350, there are multiple options for pico_float_pico
+:
+-
+pico_float_pico_vfp
+- this library leaves basic C single-precision floating point operations to the compiler which can use inlined VFP (Arm FPU) code. Custom optimized versions of trigonometric and scientific functions are provided. No DCP (RP2350 Double co-processor) instructions are used. -
+pico_float_pico_dcp
+- this library prevents the compiler injecting inlined VFP code, and also implements all single-precision floating point operations in optimized DCP or M33 code. This option is not quite as fast as pico_float_pico_vfp, however it allows floating point operations without enabling the floating point co-processor on the CPU; this can be beneficial in certain circumstances, e.g. where leaving stack in tasks or interrupts for the floating point state is undesirable.
+Note: pico_float_pico
+is equivalent to pico_float_pico_vfp
+on RP2350, as this is the most sensible default
+On Arm, (replacement) optimized implementations are provided for the following compiler built-ins and math library functions when using _pico
+variants of pico_float
+:
+-
+basic arithmetic: (except
+pico_float_pico_vfp
+)__aeabi_fadd, __aeabi_fdiv, __aeabi_fmul, __aeabi_frsub, __aeabi_fsub
+-
+comparison: (except
+pico_float_pico_vfp
+)__aeabi_cfcmpeq, __aeabi_cfrcmple, __aeabi_cfcmple, __aeabi_fcmpeq, __aeabi_fcmplt, __aeabi_fcmple, __aeabi_fcmpge, __aeabi_fcmpgt, __aeabi_fcmpun
+-
+(u)int32 ←> float: (except
+pico_float_pico_vfp
+)__aeabi_i2f, __aeabi_ui2f, __aeabi_f2iz, __aeabi_f2uiz
+-
+(u)int64 ←> float: (except
+pico_float_pico_vfp
+)__aeabi_l2f, __aeabi_ul2f, __aeabi_f2lz, __aeabi_f2ulz
+-
+float -> double: (except
+pico_float_pico_vfp
+)__aeabi_f2d
+-
+basic trigonometric:
+sqrtf, cosf, sinf, tanf, atan2f, expf, logf
+-
+trigonometric and scientific
+ldexpf, copysignf, truncf, floorf, ceilf, roundf, asinf, acosf, atanf, sinhf, coshf, tanhf, asinhf, acoshf, atanhf, exp2f, log2f, exp10f, log10f, powf, hypotf, cbrtf, fmodf, dremf, remainderf, remquof, expm1f, log1pf, fmaf
+-
+GNU exetnsions:
+powintf, sincosf
+On Arm, the following additional optimized functions are also provided (when using _pico
+variants of pico_float
+):
+-
+Conversions to/from integer types:
+-
+(u)int -> float (round to nearest):
+int2float, uint2float, int642float, uint642float
+note: on
+pico_float_pico_vfp
+the 32-bit functions are also provided as C macros since they map to inline VFP code -
+(u)float -> int (round towards zero):
+float2int_z, float2uint_z, float2int64_z, float2uint64_z
+note: on
+pico_float_pico_vfp
+the 32-bit functions are also provided as C macros since they map to inline VFP code -
+(u)float -> int (round towards -infinity):
+float2int, float2uint, float2int64, float2uint64
+-
+-
+Conversions to/from fixed point integers:
+-
+(u)fix -> float (round to nearest):
+fix2float, ufix2float, fix642float, ufix642float
+-
+float -> (u)fix (round towards zero):
+float2fix_z, float2ufix_z, float2fix64_z, float2ufix64_z
+note: on
+pico_float_pico_vfp
+the 32-bit functions are also provided as C macros since they can map to inline VFP code when the number of fractional bits is a compile time constant between 1 and 32 -
+float -> (u)fix (round towards -infinity):
+float2fix, float2ufix, float2fix64, float2ufix64
+note: on
+pico_float_pico_vfp
+the 32-bit functions are also provided as C macros since they can map to inline VFP code when the number of fractional bits is a compile time constant between 1 and 32
+-
+-
+Even faster versions of divide and square-root functions that do not round correctly: (
+pico_float_pico_dcp
+only)fdiv_fast, sqrtf_fast
+On RISC-V, (replacement) optimized implementations are provided for the following compiler built-ins when using the pico_float_pico
+library (note that there are no variants of this library like there are on Arm):
+-
+basic arithmetic:
+__addsf3, __subsf3, __mulsf3
+pico_int64_ops
+Optimized replacement implementations of the compiler built-in 64 bit multiplication.
+pico_mem_ops
+Provides optimized replacement implementations of the compiler built-in memcpy, memset and related functions.
+pico_platform
+Macros and definitions (and functions when included by non assembly code) for the RP2 family device / architecture to provide a common abstraction over low level compiler / platform specifics.
+Detailed Description
+Macros and definitions for accessing the CPU registers.
+This header may be included by assembly code
+This header may be included by assembly code
+Macros
+-
+#define __fast_mul(a, b)
+-
+#define __isr
+-
+#define __force_inline __always_inline
+-
+#define count_of(a) (sizeof(a)/sizeof((a)[0]))
+-
+#define MAX(a, b) ((a)>(b)?(a):(b))
+-
+#define MIN(a, b) ((b)>(a)?(a):(b))
+-
+#define __check_type_compatible(type_a, type_b) static_assert(__builtin_types_compatible_p(type_a, type_b), __STRING(type_a) " is not compatible with " __STRING(type_b));
+-
+#define __after_data(group) __attribute__((section(".after_data." group)))
+-
+#define __scratch_x(group) __attribute__((section(".scratch_x." group)))
+-
+#define __scratch_y(group) __attribute__((section(".scratch_y." group)))
+-
+#define __uninitialized_ram(group) __attribute__((section(".uninitialized_data." #group))) group
+-
+#define __in_flash(group) __attribute__((section(".flashdata." group)))
+-
+#define __no_inline_not_in_flash_func(func_name) __noinline __not_in_flash_func(func_name)
+Functions
+static void busy_wait_at_least_cycles (uint32_t minimum_cycles)
+-
+Helper method to busy-wait for at least the given number of cycles.
+static __force_inline void __breakpoint (void)
+-
+Execute a breakpoint instruction.
+static __force_inline uint get_core_num (void)
+-
+Get the current core number.
+static __force_inline uint __get_current_exception (void)
+-
+Get the current exception level on this core.
+-
+static __force_inline bool pico_processor_state_is_nonsecure (void)
+RP2350 -
+Return true if executing in the NonSecure state (Arm-only)
+-
+uint8_t rp2350_chip_version (void)
+RP2350 -
+Returns the RP2350 chip revision number.
+-
+static uint8_t rp2040_chip_version (void)
+RP2350 -
+Returns the RP2040 chip revision number for compatibility.
+static uint8_t rp2040_rom_version (void)
+-
+Returns the RP2040 rom version number.
+static __force_inline int32_t __mul_instruction (int32_t a, int32_t b)
+-
+Multiply two integers using an assembly
+MUL
+instruction. static __force_inline void tight_loop_contents (void)
+-
+No-op function for the body of tight loops.
+static __always_inline void __compiler_memory_barrier (void)
+-
+Ensure that the compiler does not move memory access across this method call.
+void panic_unsupported (void)
+-
+Panics with the message "Unsupported".
+void panic (const char *fmt,…)
+-
+Displays a panic message and halts execution.
+Macro Definition Documentation
+__fast_mul
+#define __fast_mul(a, b) __builtin_choose_expr(__builtin_constant_p(b) && !__builtin_constant_p(a), \
+(__builtin_popcount(b) >= 2 ? __mul_instruction(a,b) : (a)*(b)), \
+(a)*(b))
+multiply two integer values using the fastest method possible
+Efficiently multiplies value a by possibly constant value b.
+If b is known to be constant and not zero or a power of 2, then a mul instruction is used rather than gcc’s default which is often a slow combination of shifts and adds. If b is a power of 2 then a single shift is of course preferable and will be used
+Parameters
+a
+|
+the first operand |
+b
+|
+the second operand |
+Returns
+a * b
+__isr
+#define __isr
+Marker for an interrupt handler.
+For example an IRQ handler function called my_interrupt_handler:
+void __isr my_interrupt_handler(void) {
+__force_inline
+#define __force_inline __always_inline
+Attribute to force inlining of a function regardless of optimization level.
+For example my_function here will always be inlined:
+int __force_inline my_function(int x) {
+count_of
+#define count_of(a) (sizeof(a)/sizeof((a)[0]))
+Macro to determine the number of elements in an array.
+__check_type_compatible
+#define __check_type_compatible(type_a, type_b) static_assert(__builtin_types_compatible_p(type_a, type_b), __STRING(type_a) " is not compatible with " __STRING(type_b));
+Utility macro to assert two types are equivalent.
+This macro can be useful in other macros along with typeof
+to assert that two parameters are of equivalent type (or that a single parameter is of an expected type)
+__after_data
+#define __after_data(group) __attribute__((section(".after_data." group)))
+Section attribute macro for placement in RAM after the .data
+section.
+For example a 400 element uint32_t
+array placed after the .data section
+uint32_t __after_data("my_group_name") a_big_array[400];
+The section attribute is .after_data.<group>
+Parameters
+group
+|
+a string suffix to use in the section name to distinguish groups that can be linker garbage-collected independently |
+__scratch_x
+#define __scratch_x(group) __attribute__((section(".scratch_x." group)))
+Section attribute macro for placement not in flash (i.e in RAM)
+For example a 3 element uint32_t
+array placed in RAM (even though it is static const
+)
+static const uint32_t __not_in_flash("my_group_name") an_array[3];
+The section attribute is .time_critical.<group>
+Parameters
+group
+|
+a string suffix to use in the section name to distinguish groups that can be linker garbage-collected independently |
+Section attribute macro for placement in the SRAM bank 4 (known as "scratch X")
+Scratch X is commonly used for critical data and functions accessed only by one core (when only one core is accessing the RAM bank, there is no opportunity for stalls)
+For example a uint32_t
+variable placed in "scratch X"
+uint32_t __scratch_x("my_group_name") foo = 23;
+The section attribute is .scratch_x.<group>
+Parameters
+group
+|
+a string suffix to use in the section name to distinguish groups that can be linker garbage-collected independently |
+__scratch_y
+#define __scratch_y(group) __attribute__((section(".scratch_y." group)))
+Section attribute macro for placement in the SRAM bank 5 (known as "scratch Y")
+Scratch Y is commonly used for critical data and functions accessed only by one core (when only one core is accessing the RAM bank, there is no opportunity for stalls)
+For example a uint32_t
+variable placed in "scratch Y"
+uint32_t __scratch_y("my_group_name") foo = 23;
+The section attribute is .scratch_y.<group>
+Parameters
+group
+|
+a string suffix to use in the section name to distinguish groups that can be linker garbage-collected independently |
+__uninitialized_ram
+#define __uninitialized_ram(group) __attribute__((section(".uninitialized_data." #group))) group
+Section attribute macro for data that is to be left uninitialized.
+Data marked this way will retain its value across a reset (normally uninitialized data - in the .bss section) is initialized to zero during runtime initialization
+For example a uint32_t
+foo that will retain its value if the program is restarted by reset.
+uint32_t __uninitialized_ram(foo);
+The section attribute is .uninitialized_data.<group>
+Parameters
+group
+|
+a string suffix to use in the section name to distinguish groups that can be linker garbage-collected independently |
+__in_flash
+#define __in_flash(group) __attribute__((section(".flashdata." group)))
+Section attribute macro for placement in flash even in a COPY_TO_RAM binary.
+For example a uint32_t
+variable explicitly placed in flash (it will hard fault if you attempt to write it!)
+uint32_t __in_flash("my_group_name") foo = 23;
+The section attribute is .flashdata.<group>
+Parameters
+group
+|
+a string suffix to use in the section name to distinguish groups that can be linker garbage-collected independently |
+__no_inline_not_in_flash_func
+#define __no_inline_not_in_flash_func(func_name) __noinline __not_in_flash_func(func_name)
+Indicates a function should not be stored in flash.
+Decorates a function name, such that the function will execute from RAM (assuming it is not inlined into a flash function by the compiler)
+For example a function called my_func taking an int parameter:
+void __not_in_flash_func(my_func)(int some_arg) {
+The function is placed in the .time_critical.<func_name>
+linker section
+See also
+Indicates a function is time/latency critical and should not run from flash
+Decorates a function name, such that the function will execute from RAM (assuming it is not inlined into a flash function by the compiler) to avoid possible flash latency. Currently this macro is identical in implementation to __not_in_flash_func
+, however the semantics are distinct and a __time_critical_func
+may in the future be treated more specially to reduce the overhead when calling such function from a flash function.
+For example a function called my_func taking an int parameter:
+void __time_critical_func(my_func)(int some_arg) {
+The function is placed in the .time_critical.<func_name>
+linker section
+See also
+__not_in_flash_func
+Indicate a function should not be stored in flash and should not be inlined
+Decorates a function name, such that the function will execute from RAM, explicitly marking it as noinline to prevent it being inlined into a flash function by the compiler
+For example a function called my_func taking an int parameter:
+void __no_inline_not_in_flash_func(my_func)(int some_arg) {
+The function is placed in the .time_critical.<func_name>
+linker section
+Function Documentation
+__breakpoint
+static __force_inline void __breakpoint (void) [static]
+Execute a breakpoint instruction.
+__compiler_memory_barrier
+static __always_inline void __compiler_memory_barrier (void) [static]
+Ensure that the compiler does not move memory access across this method call.
+For example in the following code:
+*some_memory_location = var_a;
+__compiler_memory_barrier();
+uint32_t var_b = *some_other_memory_location
+The compiler will not move the load from some_other_memory_location
+above the memory barrier (which it otherwise might - even above the memory store!)
+__get_current_exception
+static __force_inline uint __get_current_exception (void) [static]
+Get the current exception level on this core.
+On Cortex-M this is the exception number defined in the architecture reference, which is equal to VTABLE_FIRST_IRQ + irq num if inside an interrupt handler. (VTABLE_FIRST_IRQ is defined in platform_defs.h).
+On Hazard3, this function returns VTABLE_FIRST_IRQ + irq num if inside of an external IRQ handler (or a fault from such a handler), and 0 otherwise, generally aligning with the Cortex-M values.
+Returns
+the exception number if the CPU is handling an exception, or 0 otherwise
+__mul_instruction
+static __force_inline int32_t __mul_instruction (int32_t a, int32_t b) [static]
+Multiply two integers using an assembly MUL
+instruction.
+This multiplies a by b using multiply instruction using the ARM mul instruction regardless of values (the compiler might otherwise choose to perform shifts/adds), i.e. this is a 1 cycle operation.
+Parameters
+a
+|
+the first operand |
+b
+|
+the second operand |
+Returns
+a * b
+busy_wait_at_least_cycles
+static void busy_wait_at_least_cycles (uint32_t minimum_cycles) [inline], [static]
+Helper method to busy-wait for at least the given number of cycles.
+This method is useful for introducing very short delays.
+This method busy-waits in a tight loop for the given number of system clock cycles. The total wait time is only accurate to within 2 cycles, and this method uses a loop counter rather than a hardware timer, so the method will always take longer than expected if an interrupt is handled on the calling core during the busy-wait; you can of course disable interrupts to prevent this.
+You can use clock_get_hz(clk_sys) to determine the number of clock cycles per second if you want to convert an actual time duration to a number of cycles.
+Parameters
+minimum_cycles
+|
+the minimum number of system clock cycles to delay for |
+get_core_num
+static __force_inline uint get_core_num (void) [static]
+Get the current core number.
+Returns
+The core number the call was made from
+panic
+void panic (const char * fmt, …)
+Displays a panic message and halts execution.
+An attempt is made to output the message to all registered STDOUT drivers after which this method executes a BKPT instruction.
+Parameters
+fmt
+|
+format string (printf-like) |
+…
+|
+printf-like arguments |
+pico_processor_state_is_nonsecure RP2350
+static __force_inline bool pico_processor_state_is_nonsecure (void) [static]
+Return true if executing in the NonSecure state (Arm-only)
+Returns
+True if currently executing in the NonSecure state on an Arm processor
+rp2040_chip_version RP2350
+static uint8_t rp2040_chip_version (void) [inline], [static]
+Returns the RP2040 chip revision number for compatibility.
+Returns
+2 RP2040 errata fixed in B2 are fixed in RP2350
+rp2040_rom_version
+static uint8_t rp2040_rom_version (void) [inline], [static]
+Returns the RP2040 rom version number.
+Returns
+the RP2040 rom version number (1 for RP2040-B0, 2 for RP2040-B1, 3 for RP2040-B2)
+rp2350_chip_version RP2350
+uint8_t rp2350_chip_version (void)
+Returns the RP2350 chip revision number.
+Returns
+the RP2350 chip revision number (1 for B0/B1, 2 for B2)
+tight_loop_contents
+static __force_inline void tight_loop_contents (void) [static]
+No-op function for the body of tight loops.
+No-op function intended to be called by any tight hardware polling loop. Using this ubiquitously makes it much easier to find tight loops, but also in the future #ifdef-ed support for lockup debugging might be added
+pico_printf
+Compact replacement for printf by Marco Paland ([email protected])
+pico_runtime
+Basic runtime support for running pre-main initializers provided by other libraries.
+Functions
+void runtime_init (void)
+-
+Run all the initializations that are usually called by crt0.S before entering main.
+void __weak hard_assertion_failure (void)
+-
+Handle a hard_assert condition failure.
+Function Documentation
+hard_assertion_failure
+void __weak hard_assertion_failure (void)
+Handle a hard_assert condition failure.
+This weak function provides the default implementation (call panic with "Hard assert") for if a hard_assert condition fail in non debug builds. You can provide your own strong implementation to replace the default behavior
+See also
+hard_assert
+pico_runtime_init
+Main runtime initialization functions required to set up the runtime environment before entering main.
+Detailed Description
+The runtime initialization is registration based:
+For each step of the initialization there is a 5 digit ordinal which indicates the ordering (alphabetic increasing sort of the 5 digits) of the steps.
+e.g. for the step "bootrom_reset", there is:
+1
+2
+3
+#ifndef PICO_RUNTIME_INIT_BOOTROM_RESET
+#define PICO_RUNTIME_INIT_BOOTROM_RESET "00050"
+#endif
+The user can override the order if they wish, by redefining PICO_RUNTIME_INIT_BOOTROM_RESET
+For each step, the automatic initialization may be skipped by defining (in this case) PICO_RUNTIME_SKIP_INIT_BOOTROM_RESET = 1. The user can then choose to either omit the step completely or register their own replacement initialization.
+The default method used to perform the initialization is provided, in case the user wishes to call it manually; in this case:
+1
+void runtime_init_bootrom_reset(void);
+If PICO_RUNTIME_NO_INIT_BOOTOROM_RESET define is set (NO vs SKIP above), then the function is not defined, allowing the user to provide a replacement (and also avoiding cases where the default implementation won’t compile due to missing dependencies)
+Functions
+static void clocks_init (void)
+-
+Initialise the clock hardware.
+pico_stdio
+Customized stdio support allowing for input and output from UART, USB, semi-hosting etc.
+Detailed Description
+Note the API for adding additional input output devices is not yet considered stable
+Modules
+- pico_stdio_semihosting
+-
+Experimental support for stdout using RAM semihosting .
+- pico_stdio_uart
+-
+Support for stdin/stdout using UART .
+- pico_stdio_rtt
+-
+Support for stdin/stdout using SEGGER RTT .
+- pico_stdio_usb
+-
+Support for stdin/stdout over USB serial (CDC) .
+Functions
+bool stdio_init_all (void)
+-
+Initialize all of the present standard stdio types that are linked into the binary.
+bool stdio_deinit_all (void)
+-
+Deinitialize all of the present standard stdio types that are linked into the binary.
+void stdio_flush (void)
+-
+Flushes any buffered output.
+int stdio_getchar_timeout_us (uint32_t timeout_us)
+-
+Return a character from stdin if there is one available within a timeout.
+static int getchar_timeout_us (uint32_t timeout_us)
+-
+Alias for stdio_getchar_timeout_us for backwards compatibility.
+void stdio_set_driver_enabled (stdio_driver_t *driver, bool enabled)
+-
+Adds or removes a driver from the list of active drivers used for input/output.
+void stdio_filter_driver (stdio_driver_t *driver)
+-
+Control limiting of output to a single driver.
+void stdio_set_translate_crlf (stdio_driver_t *driver, bool translate)
+-
+control conversion of line feeds to carriage return on transmissions
+int stdio_putchar_raw (int c)
+-
+putchar variant that skips any CR/LF conversion if enabled
+static int putchar_raw (int c)
+-
+Alias for stdio_putchar_raw for backwards compatibility.
+int stdio_puts_raw (const char *s)
+-
+puts variant that skips any CR/LF conversion if enabled
+static int puts_raw (const char *s)
+-
+Alias for stdio_puts_raw for backwards compatibility.
+void stdio_set_chars_available_callback (void(*fn)(void *), void *param)
+-
+get notified when there are input characters available
+int stdio_get_until (char *buf, int len, absolute_time_t until)
+-
+Waits until a timeout to read at least one character into a buffer.
+int stdio_put_string (const char *s, int len, bool newline, bool cr_translation)
+-
+Prints a buffer to stdout with optional newline and carriage return insertion.
+int stdio_getchar (void)
+-
+Alias for getchar that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+int stdio_putchar (int)
+-
+Alias for putchar that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+int stdio_puts (const char *s)
+-
+Alias for puts that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+int stdio_vprintf (const char *format, va_list va)
+-
+Alias for vprintf that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+int __printflike (1, 0) stdio_printf(const char *format
+-
+Alias for printf that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+Function Documentation
+__printflike
+int __printflike (1, 0)
+Alias for printf that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+getchar_timeout_us
+static int getchar_timeout_us (uint32_t timeout_us) [inline], [static]
+Alias for stdio_getchar_timeout_us for backwards compatibility.
+putchar_raw
+static int putchar_raw (int c) [inline], [static]
+Alias for stdio_putchar_raw for backwards compatibility.
+puts_raw
+static int puts_raw (const char * s) [inline], [static]
+Alias for stdio_puts_raw for backwards compatibility.
+stdio_deinit_all
+bool stdio_deinit_all (void)
+Deinitialize all of the present standard stdio types that are linked into the binary.
+This method currently only supports stdio_uart and stdio_semihosting
+Returns
+true if all outputs was successfully deinitialized, false otherwise.
+See also
+stdio_uart, stdio_usb, stdio_semihosting, stdio_rtt
+stdio_filter_driver
+void stdio_filter_driver (stdio_driver_t * driver)
+Control limiting of output to a single driver.
+|
+Note
+|
+this method should always be called on an initialized driver |
+Parameters
+driver
+|
+if non-null then output only that driver will be used for input/output (assuming it is in the list of enabled drivers). if NULL then all enabled drivers will be used |
+stdio_get_until
+int stdio_get_until (char * buf, int len, absolute_time_t until)
+Waits until a timeout to read at least one character into a buffer.
+This method returns as soon as input is available, but more characters may be returned up to the end of the buffer.
+Parameters
+buf
+|
+the buffer to read into |
+len
+|
+the length of the buffer |
+Returns
+the number of characters read or PICO_ERROR_TIMEOUT
+Parameters
+until
+|
+the time after which to return PICO_ERROR_TIMEOUT if no characters are available |
+stdio_getchar
+int stdio_getchar (void)
+Alias for getchar that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+stdio_getchar_timeout_us
+int stdio_getchar_timeout_us (uint32_t timeout_us)
+Return a character from stdin if there is one available within a timeout.
+Parameters
+timeout_us
+|
+the timeout in microseconds, or 0 to not wait for a character if none available. |
+Returns
+the character from 0-255 or PICO_ERROR_TIMEOUT if timeout occurs
+stdio_init_all
+bool stdio_init_all (void)
+Initialize all of the present standard stdio types that are linked into the binary.
+Call this method once you have set up your clocks to enable the stdio support for UART, USB, semihosting, and RTT based on the presence of the respective libraries in the binary.
+When stdio_usb is configured, this method can be optionally made to block, waiting for a connection via the variables specified in stdio_usb_init (i.e. PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS)
+Returns
+true if at least one output was successfully initialized, false otherwise.
+See also
+stdio_uart, stdio_usb, stdio_semihosting, stdio_rtt
+stdio_put_string
+int stdio_put_string (const char * s, int len, bool newline, bool cr_translation)
+Prints a buffer to stdout with optional newline and carriage return insertion.
+This method returns as soon as input is available, but more characters may be returned up to the end of the buffer.
+Parameters
+s
+|
+the characters to print |
+len
+|
+the length of s |
+newline
+|
+true if a newline should be added after the string |
+cr_translation
+|
+true if line feed to carriage return translation should be performed |
+Returns
+the number of characters written
+stdio_putchar
+int stdio_putchar (int c)
+Alias for putchar that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+stdio_putchar_raw
+int stdio_putchar_raw (int c)
+putchar variant that skips any CR/LF conversion if enabled
+stdio_puts
+int stdio_puts (const char * s)
+Alias for puts that definitely does not go thru the implementation in the standard C library even when PICO_STDIO_SHORT_CIRCUIT_CLIB_FUNCS == 0.
+stdio_puts_raw
+int stdio_puts_raw (const char * s)
+puts variant that skips any CR/LF conversion if enabled
+stdio_set_chars_available_callback
+void stdio_set_chars_available_callback (void(*)(void *) fn, void * param)
+get notified when there are input characters available
+Parameters
+fn
+|
+Callback function to be called when characters are available. Pass NULL to cancel any existing callback |
+param
+|
+Pointer to pass to the callback |
+stdio_set_driver_enabled
+void stdio_set_driver_enabled (stdio_driver_t * driver, bool enabled)
+Adds or removes a driver from the list of active drivers used for input/output.
+|
+Note
+|
+this method should always be called on an initialized driver and is not re-entrant |
+Parameters
+driver
+|
+the driver |
+enabled
+|
+true to add, false to remove |
+stdio_set_translate_crlf
+void stdio_set_translate_crlf (stdio_driver_t * driver, bool translate)
+control conversion of line feeds to carriage return on transmissions
+|
+Note
+|
+this method should always be called on an initialized driver |
+Parameters
+driver
+|
+the driver |
+translate
+|
+If true, convert line feeds to carriage return on transmissions |
+pico_stdio_semihosting
+Experimental support for stdout using RAM semihosting .
+Detailed Description
+Linking this library or calling pico_enable_stdio_semihosting(TARGET ENABLED)
+in the CMake (which achieves the same thing) will add semihosting to the drivers used for standard output
+Functions
+void stdio_semihosting_init (void)
+-
+Explicitly initialize stdout over semihosting and add it to the current set of stdout targets.
+void stdio_semihosting_deinit (void)
+-
+Explicitly deinitialize stdout over semihosting and add it to the current set of stdout targets.
+Function Documentation
+stdio_semihosting_deinit
+void stdio_semihosting_deinit (void)
+Explicitly deinitialize stdout over semihosting and add it to the current set of stdout targets.
+|
+Note
+|
+this method is automatically called by stdio_deinit_all() if |
+stdio_semihosting_init
+void stdio_semihosting_init (void)
+Explicitly initialize stdout over semihosting and add it to the current set of stdout targets.
+|
+Note
+|
+this method is automatically called by stdio_init_all() if |
+pico_stdio_uart
+Support for stdin/stdout using UART .
+Detailed Description
+Linking this library or calling pico_enable_stdio_uart(TARGET ENABLED)
+in the CMake (which achieves the same thing) will add UART to the drivers used for standard input/output
+Functions
+void stdio_uart_init (void)
+-
+Explicitly initialize stdin/stdout over UART and add it to the current set of stdin/stdout drivers.
+void stdout_uart_init (void)
+-
+Explicitly initialize stdout only (no stdin) over UART and add it to the current set of stdout drivers.
+void stdin_uart_init (void)
+-
+Explicitly initialize stdin only (no stdout) over UART and add it to the current set of stdin drivers.
+void stdio_uart_init_full (uart_inst_t *uart, uint baud_rate, int tx_pin, int rx_pin)
+-
+Perform custom initialization initialize stdin/stdout over UART and add it to the current set of stdin/stdout drivers.
+void stdio_uart_deinit (void)
+-
+Explicitly deinitialize stdin/stdout over UART and remove it from the current set of stdin/stdout drivers.
+void stdout_uart_deinit (void)
+-
+Explicitly deinitialize stdout only (no stdin) over UART and remove it from the current set of stdout drivers.
+void stdin_uart_deinit (void)
+-
+Explicitly deinitialize stdin only (no stdout) over UART and remove it from the current set of stdin drivers.
+void stdio_uart_deinit_full (uart_inst_t *uart, int tx_pin, int rx_pin)
+-
+Perform custom deinitialization deinitialize stdin/stdout over UART and remove it from the current set of stdin/stdout drivers.
+Function Documentation
+stdin_uart_deinit
+void stdin_uart_deinit (void)
+Explicitly deinitialize stdin only (no stdout) over UART and remove it from the current set of stdin drivers.
+This method disables PICO_DEFAULT_UART_RX_PIN for UART input (if defined), and leaves the pads isolated
+stdin_uart_init
+void stdin_uart_init (void)
+Explicitly initialize stdin only (no stdout) over UART and add it to the current set of stdin drivers.
+This method sets up PICO_DEFAULT_UART_RX_PIN for UART input (if defined) , and configures the baud rate as PICO_DEFAULT_UART_BAUD_RATE
+stdio_uart_deinit
+void stdio_uart_deinit (void)
+Explicitly deinitialize stdin/stdout over UART and remove it from the current set of stdin/stdout drivers.
+This method disables PICO_DEFAULT_UART_TX_PIN for UART output (if defined), PICO_DEFAULT_UART_RX_PIN for input (if defined) and leaves the pads isolated.
+|
+Note
+|
+this method is automatically called by stdio_deinit_all() if |
+stdio_uart_deinit_full
+void stdio_uart_deinit_full (uart_inst_t * uart, int tx_pin, int rx_pin)
+Perform custom deinitialization deinitialize stdin/stdout over UART and remove it from the current set of stdin/stdout drivers.
+Parameters
+uart
+|
+|
+tx_pin
+|
+the UART pin to use for stdout (or -1 for no stdout) |
+rx_pin
+|
+the UART pin to use for stdin (or -1 for no stdin) |
+stdio_uart_init
+void stdio_uart_init (void)
+Explicitly initialize stdin/stdout over UART and add it to the current set of stdin/stdout drivers.
+This method sets up PICO_DEFAULT_UART_TX_PIN for UART output (if defined), PICO_DEFAULT_UART_RX_PIN for input (if defined) and configures the baud rate as PICO_DEFAULT_UART_BAUD_RATE.
+|
+Note
+|
+this method is automatically called by stdio_init_all() if |
+stdio_uart_init_full
+void stdio_uart_init_full (uart_inst_t * uart, uint baud_rate, int tx_pin, int rx_pin)
+Perform custom initialization initialize stdin/stdout over UART and add it to the current set of stdin/stdout drivers.
+Parameters
+uart
+|
+|
+baud_rate
+|
+the baud rate in Hz |
+tx_pin
+|
+the UART pin to use for stdout (or -1 for no stdout) |
+rx_pin
+|
+the UART pin to use for stdin (or -1 for no stdin) |
+stdout_uart_deinit
+void stdout_uart_deinit (void)
+Explicitly deinitialize stdout only (no stdin) over UART and remove it from the current set of stdout drivers.
+This method disables PICO_DEFAULT_UART_TX_PIN for UART output (if defined), and leaves the pad isolated
+stdout_uart_init
+void stdout_uart_init (void)
+Explicitly initialize stdout only (no stdin) over UART and add it to the current set of stdout drivers.
+This method sets up PICO_DEFAULT_UART_TX_PIN for UART output (if defined) , and configures the baud rate as PICO_DEFAULT_UART_BAUD_RATE
+pico_stdio_rtt
+Support for stdin/stdout using SEGGER RTT .
+Detailed Description
+Linking this library or calling pico_enable_stdio_rtt(TARGET)
+in the CMake (which achieves the same thing) will add RTT to the drivers used for standard output
+Functions
+void stdio_rtt_init (void)
+-
+Explicitly initialize stdin/stdout over RTT and add it to the current set of stdin/stdout drivers.
+void stdio_rtt_deinit (void)
+-
+Explicitly deinitialize stdin/stdout over RTT and remove it from the current set of stdin/stdout drivers.
+Function Documentation
+stdio_rtt_deinit
+void stdio_rtt_deinit (void)
+Explicitly deinitialize stdin/stdout over RTT and remove it from the current set of stdin/stdout drivers.
+|
+Note
+|
+this method is automatically called by stdio_deinit_all() if |
+stdio_rtt_init
+void stdio_rtt_init (void)
+Explicitly initialize stdin/stdout over RTT and add it to the current set of stdin/stdout drivers.
+|
+Note
+|
+this method is automatically called by stdio_init_all() if |
+pico_stdio_usb
+Support for stdin/stdout over USB serial (CDC) .
+Detailed Description
+Linking this library or calling pico_enable_stdio_usb(TARGET ENABLED)
+in the CMake (which achieves the same thing) will add USB CDC to the drivers used for standard input/output
+Note this library is a developer convenience. It is not applicable in all cases; for one it takes full control of the USB device precluding your use of the USB in device or host mode. For this reason, this library will automatically disengage if you try to using it alongside tinyusb_device or tinyusb_host. It also takes control of a lower level IRQ and sets up a periodic background task.
+This library also includes (by default) functionality to enable the RP-series microcontroller to be reset over the USB interface.
+Functions
+bool stdio_usb_init (void)
+-
+Explicitly initialize USB stdio and add it to the current set of stdin drivers.
+bool stdio_usb_deinit (void)
+-
+Explicitly deinitialize USB stdio and remove it from the current set of stdin drivers.
+bool stdio_usb_connected (void)
+-
+Check if there is an active stdio CDC connection to a host.
+void stdio_usb_call_chars_available_callback (void)
+-
+Explicitly calls the registered USB stdio chars_available_callback.
+Function Documentation
+stdio_usb_call_chars_available_callback
+void stdio_usb_call_chars_available_callback (void)
+Explicitly calls the registered USB stdio chars_available_callback.
+This method is normally called by the internal USB stdio background thread when there is new USB CDC data available to read. However, if the internal background thread is disabled (e.g. when the user directly links tinyUSB), the user will need to implement their own background thread and call this method directly.
+stdio_usb_connected
+bool stdio_usb_connected (void)
+Check if there is an active stdio CDC connection to a host.
+Returns
+true if stdio is connected over CDC
+stdio_usb_deinit
+bool stdio_usb_deinit (void)
+Explicitly deinitialize USB stdio and remove it from the current set of stdin drivers.
+Returns
+true if the USB CDC was deinitialized, false if an error occurred
+stdio_usb_init
+bool stdio_usb_init (void)
+Explicitly initialize USB stdio and add it to the current set of stdin drivers.
+PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS can be set to cause this method to wait for a CDC connection from the host before returning, which is useful if you don’t want any initial stdout output to be discarded before the connection is established.
+Returns
+true if the USB CDC was initialized, false if an error occurred
+Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+SPDX-License-Identifier: BSD-3-Clause
+pico_standard_binary_info
+Includes default information about the binary that can be displayed by picotool.
+Detailed Description
+Information is included only if PICO_NO_BINARY_INFO
+and PICO_NO_PROGRAM_INFO
+are both false.
+This library adds the following information to the binary:
+-
+The program name if defined (unless
+PICO_NO_BINARY_SIZE=1
+). The value isPICO_PROGRAM_NAME
+orPICO_TARGET_NAME
+if the former isn’t defined -
+The value of PICO_BOARD (unless
+PICO_NO_BI_PICO_BOARD=1
+) -
+The SDK version (unless
+PICO_NO_BI_SDK_VERSION=1
+) -
+The program version string if defined (unless
+PICO_NO_BI_PROGRAM_VERSION_STRING=1
+). The value isPICO_PROGRAM_VERSION_STRING
+-
+The program description if defined (unless
+PICO_NO_BI_PROGRAM_DESCRIPTION=1
+). The value isPICO_PROGRAM_DESCRIPTION
+-
+The program url if defined (unless
+PICO_NO_BI_PROGRAM_URL=1
+). The value isPICO_PROGRAM_URL
+-
+The boot stage 2 used if any (unless
+PICO_NO_BI_BOOT_STAGE2_NAME=1
+). The value isPICO_BOOT_STAGE2_NAME
+-
+The program build date (unless
+PICO_NO_BI_PROGRAM_BUILD_DATE=1
+). The value defaults to the C preprocessor value__DATE__
+, but can be overridden withPICO_PROGRAM_BUILD_DATE
+. Note you should do a clean build if you want to be sure this value is up to date. -
+The program build type (unless
+PICO_NO_BI_BUILD_TYPE=1
+). The value isPICO_CMAKE_BUILD_TYPE
+which comes from the CMake build - e.g. Release, Debug, RelMinSize -
+The binary size (unless
+PICO_NO_BI_BINARY_SIZE=1
+)

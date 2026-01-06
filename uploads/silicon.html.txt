@@ -1,0 +1,253 @@
+URL: https://www.raspberrypi.com/documentation/microcontrollers/silicon.html
+
+Silicon
+RP2350
+Edit this on GitHub
+RP2350 is a microcontroller designed by Raspberry Pi.
+Whether you have a Raspberry Pi Pico 2 or another RP2350-based microcontroller board, everything you need to get started is here. You’ll find support for getting started with C/C++ or MicroPython on Raspberry Pi Pico 2, and links to resources for other boards that use RP2350. There are also links to the technical documentation for both the Raspberry Pi Pico 2 microcontroller board and our RP2350 microcontroller chip.
+Why is the chip called RP2350?
+The post-fix numeral on RP2350 comes from the following,
+-
+Number of processor cores (2)
+-
+Loosely which type of processor (M33)
+-
+floor(log2(RAM / 16 kB))
+-
+floor(log2(nonvolatile / 128 kB)) or 0 if no onboard nonvolatile storage
+Technical Specification
+RP2350 is a high-performance, secure, low-cost, easy-to-use microcontroller from Raspberry Pi.
+With a large on-chip memory, symmetric dual-core processor complex, deterministic bus fabric, and rich peripheral set augmented with our unique Programmable I/O (PIO) subsystem, it provides professional users with unrivalled power and flexibility. With detailed documentation, a polished MicroPython port, and a UF2 bootloader in ROM, it has the lowest possible barrier to entry for beginner and hobbyist users.
+RP2350 is a stateless device, with support for cached execute-in-place from external QSPI memory. This design decision allows you to choose the appropriate density of non-volatile storage for your application, and to benefit from the low pricing of commodity flash parts.
+RP2350 is manufactured on a modern 40nm process node, delivering high performance, low dynamic power consumption, and low leakage, with a variety of low-power modes to support extended-duration operation on battery power.
+Key features include:
+-
+Dual Cortex-M33 or Hazard3 processors at up to 150 MHz
+-
+520 kB multi-bank high performance SRAM
+-
+Support for up to 16 MB of off-chip Flash memory via dedicated QSPI bus
+-
+DMA controller
+-
+Fully-connected AHB crossbar
+-
+On-chip programmable LDO to generate core voltage
+-
+2 on-chip PLLs to generate USB and core clocks
+-
+30 GPIO pins, 4 of which can be used as analogue inputs
+-
+Peripherals
+-
+2 UARTs
+-
+2 SPI controllers
+-
+2 I2C controllers
+-
+24 PWM channels
+-
+USB 1.1 controller and PHY, with host and device support
+-
+3 Programmable IO (PIO) blocks, 12 state machines total
+-
+Security
+RP2350 has a comprehensive security architecture, built around Arm TrustZone for Cortex-M, including the following features:
+-
+Signed boot support
+-
+8 kB of on-chip antifuse one-time-programmable (OTP) memory
+-
+SHA-256 acceleration
+-
+A hardware true random number generator (TRNG)
+Architecture Switching
+RP2350 includes a pair of open-hardware Hazard3 RISC-V cores which can be substituted at boot time for the Cortex-M33 cores. Our boot ROM can even auto-detect the architecture for which a second-stage binary has been built and reboot the chip into the appropriate mode. All features of the chip, apart from a handful of security features, and the double-precision floating-point accelerator, are available in RISC-V mode.
+RP2350-based Boards
+Designed by Raspberry Pi as both a development board, and as a reference design, the Raspberry Pi Pico 2 is based on the RP2350.
+Permission to use, copy, modify, and/or distribute this design for any purpose with or without fee is hereby granted.
+THE DESIGN IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS DESIGN INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS DESIGN.
+Other Boards
+You can find discussions around third-party RP2350-based boards on the Raspberry Pi forums.
+USB PIDs
+Many RP2350-based devices use Raspberry Pi’s USB Vendor ID and Product ID combination. If you build a third-party board based on RP2350, you may require a unique USB Product ID (PID).
+You might need a unique USB PID if you need to provide a custom driver for Windows users.
+USB-IF have given Raspberry Pi permission to license USB product ID values for its Vendor ID (0x2E8A
+) for common silicon components used with RP2350.
+To reserve a USB PID associated with Raspberry Pi’s vendor ID, follow the instructions in the Raspberry Pi USB PID git repository.
+|
+Note
+|
+If you use the standard RP2350 PID, you can use the iManufacturer , iProduct , and iSerial strings to uniquely identify your device.
+|
+RP2040
+Edit this on GitHub
+RP2040 is a microcontroller designed by Raspberry Pi.
+Whether you have a Raspberry Pi Pico 1 or another RP2040-based microcontroller board, everything you need to get started is here. You’ll find support for getting started with C/C++ or MicroPython on Raspberry Pi Pico, and links to resources for other boards that use RP2040. There are also links to the technical documentation for both the Raspberry Pi Pico microcontroller board and our RP2040 microcontroller chip.
+Why is the chip called RP2040?
+The post-fix numeral on RP2040 comes from the following,
+-
+Number of processor cores (2)
+-
+Loosely which type of processor (M0+)
+-
+floor(log2(RAM / 16k))
+-
+floor(log2(nonvolatile / 16k)) or 0 if no onboard nonvolatile storage
+Technical Specification
+RP2040 is the debut microcontroller from Raspberry Pi. It brings our signature values of high performance, low cost, and ease of use to the microcontroller space.
+With a large on-chip memory, symmetric dual-core processor complex, deterministic bus fabric, and rich peripheral set augmented with our unique Programmable I/O (PIO) subsystem, it provides professional users with unrivalled power and flexibility. With detailed documentation, a polished MicroPython port, and a UF2 bootloader in ROM, it has the lowest possible barrier to entry for beginner and hobbyist users.
+RP2040 is a stateless device, with support for cached execute-in-place from external QSPI memory. This design decision allows you to choose the appropriate density of non-volatile storage for your application, and to benefit from the low pricing of commodity flash parts.
+RP2040 is manufactured on a modern 40nm process node, delivering high performance, low dynamic power consumption, and low leakage, with a variety of low-power modes to support extended-duration operation on battery power
+Key features:
+-
+Dual Arm Cortex-M0+ @ 133 MHz
+-
+264 kB on-chip SRAM in six independent banks
+-
+Support for up to 16 MB of off-chip Flash memory via dedicated QSPI bus
+-
+DMA controller
+-
+Fully-connected AHB crossbar
+-
+Interpolator and integer divider peripherals
+-
+On-chip programmable LDO to generate core voltage
+-
+2 on-chip PLLs to generate USB and core clocks
+-
+30 GPIO pins, 4 of which can be used as analogue inputs
+-
+Peripherals
+-
+2 UARTs
+-
+2 SPI controllers
+-
+2 I2C controllers
+-
+16 PWM channels
+-
+USB 1.1 controller and PHY, with host and device support
+-
+8 PIO state machines
+-
+Design Files
+-
+Download Minimal Viable Board Design Files (KiCad)
+-
+Download VGA Carrier Board Design Files (KiCad)
+RP2040-based Boards
+Designed by Raspberry Pi as both a development board, and as a reference design, the Raspberry Pi Pico 1 is a family of RP2040-based boards.
+The design files for Raspberry Pi Pico and Pico W are available openly, with no limitations.
+-
+Download Design Files for Raspberry Pi Pico (Cadence Allegro)
+-
+Download Design Files for Raspberry Pi Pico W (Cadence Allegro)
+Permission to use, copy, modify, and/or distribute this design for any purpose with or without fee is hereby granted.
+THE DESIGN IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS DESIGN INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS DESIGN.
+Other Boards
+You can find discussions around third-party RP2040-based boards on the Raspberry Pi forums.
+USB PIDs
+Many RP2040-based devices use Raspberry Pi’s USB Vendor ID and Product ID combination. If you build a third-party board based on RP2040, you may require a unique USB Product ID (PID).
+You might need a unique USB PID if you need to provide a custom driver for Windows users.
+USB-IF have given Raspberry Pi permission to license USB product ID values for its Vendor ID (0x2E8A
+) for common silicon components used with RP2040.
+To reserve a USB PID associated with Raspberry Pi’s vendor ID, follow the instructions in the Raspberry Pi USB PID git repository.
+|
+Note
+|
+If you use the standard RP2040 PID, you can use the iManufacturer , iProduct , and iSerial strings to uniquely identify your device.
+|
+Internal Temperature Sensor
+The internal temperature sensor in the RP2040 package is a low-resolution sensor that needs to be user-calibrated to be useful to any degree of accuracy.
+A crucial part of accurately determining the temperature measured is knowing the ADC VREF voltage. The conversion formula means that small errors in the ADC VREF voltage can give quite large discrepancies in temperature calculated. The RP2040 doesn’t have an internal Fixed Voltage Reference which can be used to determine VREF voltage so VREF voltage needs to be measured manually - with the caveat it could change - or an external Fixed Voltage Reference needs to be provided.
+|
+Note
+|
+The RP2040 sensor voltage falls as temperature rises. |
+See Chapter 4, section 4.9.5 of the RP2040 Datasheet for further details of the internal temperature sensor.
+RP1
+Edit this on GitHub
+RP1 is a 12×12 mm, 0.65 mm-pitch BGA southbridge, which provides the majority of the I/O capabilities for Raspberry Pi 5.
+It provides:
+-
+4-lane PCIe 2.0 endpoint
+-
+Gigabit Ethernet MAC
+-
+2× USB 3 host controllers
+-
+Each has 1× USB 3 and 1× USB 2 port
+-
+More than twice the usable USB bandwidth vs. Raspberry Pi 4
+-
+-
+2× SDIO ports/eMMC (not used on Raspberry Pi 5)
+-
+2× MIPI transceivers (4-lane, supporting DSI and CSI-2)
+-
+Video DAC (3-channel, supporting PAL/NTSC and VGA)
+-
+Only one channel (composite) used on Raspberry Pi 5
+-
+-
+Low-speed peripherals (SPI, UART, I2C, PWM, GPIO, I2S)
+-
+Delta-sigma PWM audio out
+More information on RP1 can be found in the RP1 Peripherals document.
+Documentation
+Edit this on GitHub
+Documentation for Pico-series and other Raspberry Pi microcontroller-based boards.
+RP2350
+- RP2350 Datasheet
+-
+A microcontroller by Raspberry Pi
+- Hardware design with RP2350
+-
+Using RP2350 microcontrollers to build boards and products
+RP2040
+- RP2040 Datasheet
+-
+A microcontroller by Raspberry Pi
+- Hardware design with RP2040
+-
+Using RP2040 microcontrollers to build boards and products
+Raspberry Pi Pico 2
+- Raspberry Pi Pico 2 Datasheet
+-
+An RP2350-based microcontroller board
+- Getting started with Raspberry Pi Pico-series Microcontrollers
+-
+C/C++ development with Raspberry Pi Pico-series devices and other Raspberry Pi microcontroller-based boards
+Raspberry Pi Pico
+- Raspberry Pi Pico Datasheet
+-
+An RP2040-based microcontroller board
+- Getting started with Raspberry Pi Pico-series Microcontrollers
+-
+C/C++ development with Raspberry Pi Pico-series devices and other Raspberry Pi microcontroller-based boards
+Raspberry Pi Pico 2 W
+- Raspberry Pi Pico 2 W Datasheet
+-
+An RP2350-based microcontroller board with wireless
+- Connecting to the Internet with Raspberry Pi Pico W-series
+-
+Getting Raspberry Pi Pico W-series devices online with C/C++ or MicroPython
+Raspberry Pi Pico W
+- Raspberry Pi Pico W Datasheet
+-
+An RP2040-based microcontroller board with wireless
+- Connecting to the Internet with Raspberry Pi Pico W-series
+-
+Getting Raspberry Pi Pico W-series devices online with C/C++ or MicroPython
+Software Development
+- Raspberry Pi Pico C/C++ SDK
+-
+Libraries and tools for C/C++ development on RP2040 microcontrollers
+- Raspberry Pi Pico Python SDK
+-
+A MicroPython environment for RP2040 microcontrollers
+The API level Doxygen documentation for the Raspberry Pi Pico C/C++ SDK is also available as a micro-site.

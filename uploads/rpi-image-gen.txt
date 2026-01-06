@@ -1,0 +1,2433 @@
+Installation
+
+This layer is responsible for configuration options that dictate the
+location and output artefact type produced by bdebstrap. At the current
+time, bdebstrap is not available to install from Debian Trixie.
+
+References
+
+1.  bdebstrap home page
+
+2.  https://tracker.debian.org/pkg/bdebstrap
+
+3.  mmdebstrap home page
+
+4.  https://tracker.debian.org/pkg/mmdebstrap
+What it provides
+
+The essential layer doesn’t define variables itself but ensures that
+every build has access to:
+
+1.  Artefact naming
+
+2.  Build environment
+
+3.  Target configuration
+
+4.  Core build infrastructure
+
+Architecture Role
+
+- Foundation layer: Sits at the bottom of the dependency hierarchy
+
+- Mandatory inclusion: Cannot be excluded from any build
+
+- Infrastructure aggregation: Pulls together all essential base layers
+
+- Dependency management: Ensures consistent base infrastructure across
+  builds
+
+Benefits
+
+- Guaranteed infrastructure: Every build has the required foundation
+
+- Consistent behaviour: Same core variables available in every build
+
+- Future-proof: Easy to add more essential dependencies as needed
+
+Usage
+
+Users don’t need to explicitly include this layer - it’s automatically
+included by the build system. All other layers can depend on essential
+to ensure they have access to the core build infrastructure. This
+ensures that every rpi-image-gen build, whether filesystem-only or full
+image, has access to the fundamental build tools and configuration
+needed for successful execution.
+Common Attributes
+
+Different image layers are provided to support image generation with a
+specific footprint while allowing for customisation. Unless otherwise
+stated, the following apply to all image layers:
+
+Provider
+
+rpi-image-gen uses genimage for creating filesystem images.
+
+Default Partition Size
+
+Each partition image encapsulated in a disk image has a default size.
+Typically this is 100% of the filesystem that is created and filled,
+which means there is no headroom if the filesystem is intended to be
+writable. Customisation of images should involve setting variables
+governing size accordingly if the default is not suitable. 100% is
+likely a suitable size if the partition contains a read-only filesystem
+such as squashfs.
+
+mke2fs.conf
+
+In order to ensure ext filesystems are created consistently, image
+creation involves genimage using a particular mke2fs.conf. Additional
+options may be passed to mke2fs via the genimage template.
+
+vfat
+
+When creating FAT filesystems, different options may be passed to
+mkdosfs(8) by genimage depending on needs.
+
+Sparse Images
+
+Image layers create sparse images by default. Sparse format means
+filesystem images with lots of empty space can be transferred and
+written to device storage in a much shorter time using fastboot when
+compared with primitive tools such as dd. Other utilities such as
+bmaptool provide a similar much-improved way for storage handling of
+large images. Because genimage can create sparse images itself, this
+removes the need to use AOSP tools in the image creation flow.
+
+Warning
+
+Older versions of genimage can be problematic when creating sparse
+images. For example, genimage v16 currently shipping in Debian Bookworm
+does not create usable sparse images of vfat filesystems. Raspberry Pi
+provisioning tools such as rpi-sb-provisioner
+(https://github.com/raspberrypi/rpi-sb-provisioner) rely on sparse image
+format, so it is recommended to use the most up-to-date version of
+genimage as possible.
+Dynamic Slot Detection (A/B) – Overview and Integration
+
+This layer creates block device alias symlinks for A/B systems under
+/dev/disk/by-slot/{active,other}/{boot,system} using a combination of
+udev rules and dedicated script helpers. It prefers GPT labels
+(PARTLABELs) to classify partitions and falls back to a simple static
+map when labels aren’t available, working with both direct block devices
+and device‑mapper (DM) paths. The result is a consistent, boot‑agnostic
+way to reference the active and alternate partitions in a slot, suitable
+for both runtime and initramfs.
+
+Slotted A/B
+
+An A/B (slotted) system maintains two self-contained slots (A and B),
+each made up of a boot and system partition. One slot runs the device
+(“active”), while the other remains idle for staging updates or
+rollback. This built-in redundancy enables safe reversion (rollback) if
+boot validation fails, minimises downtime, and preserves a known‑good
+environment for recovery. It’s particularly crucial for in‑field and
+fleet devices where reliable, remote deployment of security fixes and
+critical updates can safely be applied without bricking devices. The
+trade‑off is modest extra storage, health checks and tryboot
+orchestration to decide when to promote the new slot.
+
+This layer is intended to be reusable across different A/B image
+layouts. It makes no assumptions about partitioning scheme, filesystem,
+encryption/device‑mapper layout, or update mechanism; it simply exposes
+stable by‑slot device links leaving policy to higher layers.
+
+Supported Boot Devices
+
+Devices booting from SD, eMMC and NVMe are supported.
+
+Supported Block Devices
+
+Only eligible block devices are considered for slot assignment. An
+eligible block device is one which is ’boot‑disk–backed’. A device is
+considered boot‑disk–backed if its block‑device lineage (sysfs slaves
+chain) ultimately resolves to the boot disk’s kernel device ($BOOT_DEV,
+e.g., mmcblk0 or nvme0n1). For non‑DM devices, this means the device is
+a partition of the boot disk. For DM devices, this means the device has
+the boot disk as an ancestor.
+
+Why two schemes?
+
+Hardware and images vary:
+
+- Some images set GPT labels for each slot member (preferred: simple and
+  deterministic).
+
+- Others cannot or do not use GPT labels (e.g., legacy layouts or
+  devices). For those, a static slot map provides the same result.
+
+Both paths create the same stable symlinks so higher layers do not care
+how a slot was identified.
+
+by-slot links
+
+The layer installs a set of udev rules so that upon events, installed
+helper scripts allow udev to create symlinks under:
+
+    /dev/disk/by-slot/
+      active/boot
+      active/system
+      other/boot
+      other/system
+
+“active” is the slot the device booted from. “other” is the alternate
+slot.
+
+Scheme 1: GPT labels (preferred)
+
+When a partition has a GPT PARTLABEL (e.g., boot_a, system_a, boot_b,
+system_b), the label helper maps it to one of the by-slot links above.
+No probing beyond labels is required. The active/other determination is
+derived from the boot partition’s label. Labels must be consistent
+across slot members and lower case.
+
+Scheme 2: Static slot map (fallback)
+
+For unlabeled partitions, a static map provides exact device identities
+for each slot member. The map is evaluated against the current boot
+device to decide which pair is “active”.
+
+The map file should be installed as file `/boot/slot.map` in the chroot
+prior to image creation.
+
+Supported map format (one triplet key per line):
+
+    a.boot=KIND:NAME:PART
+    a.system=KIND:NAME:PART
+    b.boot=KIND:NAME:PART
+    b.system=KIND:NAME:PART
+
+Triplet semantics:
+
+- KIND empty: resolves to /dev/${BOOT_DEV}p${PART} where BOOT_DEV is the
+  current boot device (e.g., mmcblk0 or nvme0n1).
+
+- KIND mapper: resolves to /dev/mapper/${NAME}${PART} (for
+  dm‑crypt/LVM).
+
+- PART: decimal partition number (required).
+
+Example:
+
+    a.boot=::2
+    a.system=::4
+    b.boot=::3
+    b.system=mapper:cryptroot:1
+
+The helper resolves these to absolute devices, detects which *.boot
+matches the current boot partition, and maps it to one of the by-slot
+links above.
+
+tryboot
+
+The helper rpi-slot-tryboot prints a Raspberry Pi tryboot config
+fragment to stdout, derived from /dev/disk/by-slot/{active,other}/boot.
+
+Initramfs
+
+A script sets the root device to /dev/disk/by-slot/active/system at
+runtime. If this alias is not a block device, the system reboots
+immediately.
+
+Notes
+
+- Both DM and non‑DM devices are supported by either scheme.
+
+- Labels take precedence. The static map is used only when labels are
+  absent.
+Installation
+
+Configuration variable IGconf_connect_on provided by this layer dictates
+whether Raspberry Pi Connect is enabled at system start up. This is
+equivalent to running rpi-connect on from the device command line.
+
+Authentication Key
+
+To link your device to your Raspberry Pi Connect account automatically,
+generate an Auth key in your account Settings and set
+IGconf_connect_authkey to either:
+
+- An absolute path to a file containing the key, or
+
+- The key value itself
+
+Like other variables, IGconf_connect_authkey can be set on the command
+line or via the config system. For example:
+
+    $ rpi-image-gen build <args> -- IGconf_connect_authkey=$KEY
+
+    connect:
+       authkey: /path/to/file
+
+    connect:
+       authkey: $KEY
+
+systemd
+
+This layer enables user lingering for IGconf_device_user1 so that
+Connect runs even if the user is not logged in. See systemd loginctl.
+
+Suitability
+
+Choose the layer that matches your deployment and needs:
+
+- rpi-connect-lite (no screen-sharing support: remote shell only)
+
+  - Headless devices or systems without a Desktop
+
+  - Low-resource machines (limited CPU/RAM/disk)
+
+  - Servers or remote-only nodes
+
+  - When Desktop screen sharing is not required
+
+- rpi-connect (supports screen-sharing and remote shell)
+
+  - Remote access to the Desktop is required
+
+  - Need the full feature set and widest compatibility
+
+If unsure: use the full client on Desktop systems; use the lite client
+on headless devices.
+
+Please refer to the Raspberry Pi Connect documentation for further
+details.
+Installation
+
+Configuration variable IGconf_connect_on provided by this layer dictates
+whether Raspberry Pi Connect is enabled at system start up. This is
+equivalent to running rpi-connect on from the device command line.
+
+Authentication Key
+
+To link your device to your Raspberry Pi Connect account automatically,
+generate an Auth key in your account Settings and set
+IGconf_connect_authkey to either:
+
+- An absolute path to a file containing the key, or
+
+- The key value itself
+
+Like other variables, IGconf_connect_authkey can be set on the command
+line or via the config system. For example:
+
+    $ rpi-image-gen build <args> -- IGconf_connect_authkey=$KEY
+
+    connect:
+       authkey: /path/to/file
+
+    connect:
+       authkey: $KEY
+
+systemd
+
+This layer enables user lingering for IGconf_device_user1 so that
+Connect runs even if the user is not logged in. See systemd loginctl.
+
+Suitability
+
+Choose the layer that matches your deployment and needs:
+
+- rpi-connect-lite (no screen-sharing support: remote shell only)
+
+  - Headless devices or systems without a Desktop
+
+  - Low-resource machines (limited CPU/RAM/disk)
+
+  - Servers or remote-only nodes
+
+  - When Desktop screen sharing is not required
+
+- rpi-connect (supports screen-sharing and remote shell)
+
+  - Remote access to the Desktop is required
+
+  - Need the full feature set and widest compatibility
+
+If unsure: use the full client on Desktop systems; use the lite client
+on headless devices.
+
+Please refer to the Raspberry Pi Connect documentation for further
+details.
+Installation
+
+Configuration variable IGconf_connect_on provided by this layer dictates
+whether Raspberry Pi Connect is enabled at system start up. This is
+equivalent to running rpi-connect on from the device command line.
+
+Authentication Key
+
+To link your device to your Raspberry Pi Connect account automatically,
+generate an Auth key in your account Settings and set
+IGconf_connect_authkey to either:
+
+- An absolute path to a file containing the key, or
+
+- The key value itself
+
+Like other variables, IGconf_connect_authkey can be set on the command
+line or via the config system. For example:
+
+    $ rpi-image-gen build <args> -- IGconf_connect_authkey=$KEY
+
+    connect:
+       authkey: /path/to/file
+
+    connect:
+       authkey: $KEY
+
+systemd
+
+This layer enables user lingering for IGconf_device_user1 so that
+Connect runs even if the user is not logged in. See systemd loginctl.
+
+Suitability
+
+Choose the layer that matches your deployment and needs:
+
+- rpi-connect-lite (no screen-sharing support: remote shell only)
+
+  - Headless devices or systems without a Desktop
+
+  - Low-resource machines (limited CPU/RAM/disk)
+
+  - Servers or remote-only nodes
+
+  - When Desktop screen sharing is not required
+
+- rpi-connect (supports screen-sharing and remote shell)
+
+  - Remote access to the Desktop is required
+
+  - Need the full feature set and widest compatibility
+
+If unsure: use the full client on Desktop systems; use the lite client
+on headless devices.
+
+Please refer to the Raspberry Pi Connect documentation for further
+details.
+Compatibility
+
+This layer installs the v8 kernel which is compatible with any 64-bit
+capable device. It also installs boot firmware, wireless LAN and
+Bluetooth firmware compatible with all Raspberry Pi devices.
+
+References
+
+1.  Raspberry Pi linux kernel documentation
+
+2.  Raspberry Pi hardware documentation
+Overview
+
+The rpi-splash-screen layer provides fullscreen splash screen support
+for Raspberry Pi devices. It configures the kernel and initramfs to
+display a custom image during boot, hiding kernel messages and providing
+a cleaner boot experience.
+
+Features
+
+- Fullscreen boot logo: Display a custom image that covers the entire
+  screen
+
+- Early boot display: Image appears as early as possible in the boot
+  process
+
+- Automatic configuration: Handles initramfs and kernel command line
+  setup
+
+- Flexible validation: Optional image checks can be skipped for testing
+
+- Customisable behaviour: Control whether cmdline.txt is automatically
+  updated
+
+How It Works
+
+The splash screen layer:
+
+1.  Installs the rpi-splash-screen-support package containing the
+    configuration tools
+
+2.  Validates your splash image meets the technical requirements
+
+3.  Copies the image to /lib/firmware/logo.tga
+
+4.  Adds an initramfs hook to load the image early in boot
+
+5.  Updates the kernel command line with required parameters
+
+6.  Rebuilds the initramfs with the new configuration
+
+The splash screen uses the kernel’s built-in fullscreen_logo
+functionality, which requires specific image formats and dimensions.
+
+Technical Requirements
+
+Image Specifications
+
+- Format: TGA (Targa) image file
+
+- Colour depth: 24-bit
+
+- Maximum dimensions: 1920×1080 pixels
+
+- Maximum colours: 224 colours
+
+- Compression: Uncompressed
+
+Kernel Parameters
+
+The layer configures the following kernel command line parameters:
+
+- fullscreen_logo=1: Enable fullscreen logo display
+
+- fullscreen_logo_name=logo.tga: Specify the logo filename
+
+- vt.global_cursor_default=0: Hide the cursor
+
+Configuration Variables
+
+The layer declares the following configuration variables with prefix
+splash:
+
+image_path
+
+- Type: String (path)
+
+- Default: ${DIRECTORY}/default-splash.tga
+
+- Required: No (can be empty to skip installation)
+
+- Description: Path to the splash screen image file. Can be absolute or
+  relative to the layer directory.
+
+skip_image_checks
+
+- Type: Boolean
+
+- Default: n
+
+- Required: No
+
+- Description: Skip validation of image dimensions, colour depth and
+  colour count. Not recommended for production use.
+
+update_cmdline
+
+- Type: Boolean
+
+- Default: y
+
+- Required: No
+
+- Description: Automatically update /boot/firmware/cmdline.txt to enable
+  the splash screen. Set to n if using custom boot configurations.
+
+Usage Examples
+
+Basic Configuration
+
+    layer:
+      base: trixie-minbase
+      splash: rpi-splash-screen
+
+    splash:
+      image_path: /home/user/my-logo.tga
+
+Skip Splash Installation
+
+    layer:
+      base: trixie-minbase
+      splash: rpi-splash-screen
+
+    splash:
+      image_path: ""  # Empty string skips installation
+
+Custom Boot Configuration
+
+    layer:
+      base: trixie-minbase
+      splash: rpi-splash-screen
+
+    splash:
+      image_path: /path/to/splash.tga
+      update_cmdline: n  # Don't modify cmdline.txt automatically
+
+Testing with Lenient Validation
+
+    layer:
+      base: trixie-minbase
+      splash: rpi-splash-screen
+
+    splash:
+      image_path: /path/to/test-splash.tga
+      skip_image_checks: y  # For testing only
+
+Creating Splash Images
+
+Using the Example Script (Quickest Method)
+
+The layer includes a helper script for quick testing:
+
+    # Generate a simple text-based splash screen
+    ./layer/rpi/device/splash-screen/EXAMPLE-splash.sh "Welcome to Raspberry Pi" splash.tga
+
+    # The script creates a 1920×1080 black background with centred white text
+    # Output is automatically in the correct TGA format
+
+This is the easiest way to create a splash screen for testing or simple
+deployments.
+
+Using ImageMagick
+
+    # Convert and optimise an existing image
+    convert input.png \
+      -resize 1920x1080 \
+      -background black \
+      -gravity center \
+      -extent 1920x1080 \
+      -depth 8 \
+      -colors 224 \
+      -type truecolor \
+      output.tga
+
+Using GIMP
+
+1.  Open your image in GIMP
+
+2.  Scale to 1920×1080 or smaller (Image → Scale Image)
+
+3.  Ensure RGB mode (Image → Mode → RGB)
+
+4.  Reduce colours: Image → Mode → Indexed → Set 224 colours maximum
+
+5.  Convert back to RGB: Image → Mode → RGB
+
+6.  Export as TGA: File → Export As
+
+7.  Select 24-bit, disable RLE compression
+
+Dependencies
+
+The layer requires:
+
+- rpi-essential-base: Provides basic system utilities
+
+- rpi-splash-screen-support: Raspberry Pi splash screen configuration
+  tool
+
+- initramfs-tools: For initramfs generation and hooks
+
+Files Modified
+
+The layer modifies the following files in the target system:
+
+- /lib/firmware/logo.tga: The splash screen image
+
+- /etc/initramfs-tools/hooks/splash-screen-hook.sh: Initramfs hook
+
+- /boot/firmware/cmdline.txt: Kernel command line (if update_cmdline=y)
+
+- Initramfs images in /boot/firmware/
+
+Troubleshooting
+
+Splash Screen Doesn’t Appear
+
+1.  Check that /lib/firmware/logo.tga exists in the built image
+
+2.  Verify /boot/firmware/cmdline.txt contains the required parameters
+
+3.  Ensure initramfs was rebuilt correctly
+
+4.  Check image meets technical requirements
+
+Image Validation Fails
+
+1.  Verify image is 24-bit TGA format
+
+2.  Check dimensions are ≤1920×1080
+
+3.  Reduce colour count to <224
+
+4.  Ensure image is uncompressed
+
+Boot Fails After Configuration
+
+1.  Set update_cmdline: n and configure manually
+
+2.  Check initramfs hook installed correctly
+
+3.  Review build logs for errors
+
+References
+
+- Raspberry Pi Splash Screen Support
+
+- The layer includes EXAMPLE-splash.sh helper script for quick splash
+  screen generation
+
+See Also
+
+- Core Essential Layer
+
+- Boot Firmware Layer
+Support
+
+The Raspbian distribution is supported by its community of developers.
+
+References
+
+https://raspbian.org
+https://archive.raspbian.org
+https://bugs.launchpad.net/raspbian/+bugs
+https://launchpad.net/~raspbian-dev
+Support
+
+The Raspbian distribution is supported by its community of developers.
+
+References
+
+https://raspbian.org
+https://archive.raspbian.org
+https://bugs.launchpad.net/raspbian/+bugs
+https://launchpad.net/~raspbian-dev
+rpi-image-gen is a tool for creating custom software images for
+Raspberry Pi devices. It runs best on a Raspberry Pi Host running
+up-to-date 64-bit Raspberry Pi OS.
+
+For the tool used to create the Raspberry Pi OS distribution, please go
+to https://github.com/RPi-Distro/pi-gen
+
+NOTE rpi-image-gen is under active development. Please report issues at
+https://github.com/raspberrypi/rpi-image-gen. Feature suggestions are
+welcome.
+
+Quick Start
+
+From Source
+
+    git clone https://github.com/raspberrypi/rpi-image-gen.git
+    cd rpi-image-gen
+    sudo ./install_deps.sh
+    ./rpi-image-gen build -c ./config/bookworm-minbase.yaml
+
+The device image will be in
+./work/image-deb12-arm64-min/deb12-arm64-min.img
+
+Install it onto an SD card using Raspberry Pi Imager
+(https://www.raspberrypi.com/software/). Select "Use Custom" if using
+the GUI, or use the command line:
+
+    sudo rpi-imager --cli ./work/image-deb12-arm64-min/deb12-arm64-min.img /dev/mmcblk0
+
+Note: This image intentionally has login passwords disabled.
+
+To install via other means, for example using rpiboot with
+pi-gen-micro’s usb mass-storage or fastboot gadget, or provisioning with
+rpi-sb-provisioner, take a look at the documentation in those
+repositories.
+
+The rpi-image-gen technical documentation and examples directory provide
+customisation and usage guidance.
+
+Why use this?
+
+- Fast builds - Uses pre-built packages instead of building from source
+
+- Production-ready - Same binaries used by millions in production
+  worldwide
+
+- Compatible - Use the same library versions as Raspberry Pi OS
+
+- Customisable - Configure your filesystem exactly as needed
+
+- Secure - Integrate with rpi-sb-provisioner
+  (https://github.com/raspberrypi/rpi-sb-provisioner) to automatically
+  set up signed boot and encrypted filesystems
+
+- Auditable - Generate Software Bill of Materials and CVE reports to
+  give consumers of your image confidence
+
+rpi-image-gen is a versatile image generation and build automation tool
+designed to create reproducible operating system artefacts. It supports
+producing bootable disk images, partitioned media layouts, and
+device-agnostic filesystem tarballs from declarative configurations. The
+tool integrates package management, filesystem assembly, and image
+layout definition, enabling consistent builds for embedded devices,
+virtual machines, and general-purpose systems. By separating build logic
+from target hardware specifics, it simplifies cross-platform image
+creation, CI workflows, and distribution packaging.
+
+Core Concepts
+
+- Configuration - Declare variables and build attributes in simple, easy
+  to read files
+
+- Layers - Modular, composable components with automatic variable
+  checking, validation policies and comprehensive documentation
+
+- Hooks - Shell scripts that run at defined points in the build process
+
+Architecture
+
+rpi-image-gen uses:
+
+- bdebstrap (https://github.com/bdrung/bdebstrap) for modular layer
+  application
+
+- mmdebstrap (https://gitlab.mister-muffin.de/josch/mmdebstrap) for
+  filesystem construction
+
+- genimage (https://github.com/pengutronix/genimage/) for disk image
+  creation
+
+- YAML for file-based configuration
+
+- podman unshare to handle filesystem ownership correctly using linux
+  namespaces
+
+The tool runs as a regular user and does not require root privileges.
+
+[]
+
+Dependencies
+
+Install required base dependencies: ---- sudo ./install_deps.sh ----
+
+See the depends file for the complete list of required packages.
+
+rpi-image-gen builds its own copies of critical host tools so it always
+has current, fully featured versions and supports architectures the
+workstation distribution might not package. Installing and running them
+from a private sysroot keeps the host system untouched. The trade-off is
+a small one-time build delay, plus additional native dependencies that
+most developer workstations already carry. The resulting tools live in a
+reusable sysroot that stays isolated from distribution packages and can
+be reused for every build.
+
+Important
+
+rpi-image-gen is developed on Raspberry Pi OS and supports builds on
+Debian Bookworm and Trixie arm64 systems. It expects a Debian-based host
+and will run on non-arm64 platforms (such as x86_64) via QEMU emulation
+or in container environments, although those non-native setups aren’t
+formally supported.
+
+Documentation
+
+Technical Information
+
+- Index - Comprehensive reference for the configuration system, layer
+  management, metadata, variable validation, provisioning, execution
+  flow, etc.
+
+Examples
+
+See the examples/ directory for tips and help
+
+Directory Structure:
+
+- bin/ - Common executable files and utilities
+
+- config/ - Configuration files
+
+- device/ - Device specific assets
+
+- docs/ - Technical documentation
+
+- examples/ - Examples and howto
+
+- image/ - Disk layout specific assets
+
+- keydir/ - Cryptographic assets
+
+- layer/ - Layer library
+
+- layer-hooks/ - Common hooks used by layer library
+
+- lib/ - Execution helpers and macros, eg CLI handling, reusable
+  constructs
+
+- package/ - Build recipes and framework for tools
+
+- scripts/ - Dedicated functional hooks, eg for bdebstrap
+
+- site/ - Core Python engine classes
+
+- templates/ - Templating assets, eg doc generation
+
+- test/ - Test harness
+
+Basic Usage
+
+    # Building
+    rpi-image-gen build -c config/my-system.yaml
+
+    # Specify the source directory
+    rpi-image-gen build -S /path/to/my/assets -c /path/to/my/config.yaml
+
+    # List all available layers
+    rpi-image-gen layer --list
+
+    # Describe a layer
+    rpi-image-gen layer --describe my-layer
+
+    # Lint a layer file when developing a custom solution
+    rpi-image-gen metadata --lint /path/to/my/layer.yaml
+
+    # See all options
+    rpi-image-gen --help
+
+Integration
+
+rpi-image-gen is designed for integration with external build systems:
+
+- External directories can provide custom configs and layers
+
+- Reusable components allow developers to easily apply their
+  customisations on top of built-in defaults
+
+- Hooks provide integration points throughout the build process
+
+- SBOM generation for security and compliance workflows
+
+Getting Help
+
+- Documentation: Technical reference index
+
+- Issues: https://github.com/raspberrypi/rpi-image-gen/issues
+
+- Examples: examples/ directory
+
+- Layer reference: rpi-image-gen layer --help
+# For more options and information see
+# http://rptl.io/configtxt
+# Some settings may impact device functionality. See link above for details
+
+# Uncomment some or all of these to enable the optional hardware interfaces
+#dtparam=i2c_arm=on
+#dtparam=i2s=on
+#dtparam=spi=on
+
+# Enable audio (loads snd_bcm2835)
+dtparam=audio=on
+
+# Additional overlays and parameters are documented
+# /boot/firmware/overlays/README
+
+# Automatically load overlays for detected cameras
+camera_auto_detect=1
+
+# Automatically load overlays for detected DSI displays
+display_auto_detect=1
+
+# Automatically load initramfs files, if found
+auto_initramfs=1
+
+# Enable DRM VC4 V3D driver
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+
+# Don't have the firmware create an initial video= setting in cmdline.txt.
+# Use the kernel's default instead.
+disable_fw_kms_setup=1
+
+# Disable compensation for displays with overscan
+disable_overscan=1
+
+# Run as fast as firmware / board allows
+arm_boost=1
+
+[pi02]
+# If don't care about Bluetooth use the line below to get the pl011 instead of 8250 UART
+# and use console=ttyAMA0,115200
+# dtoverlay=disable-bt
+enable_uart=1
+
+[pi4]
+enable_uart=1
+
+[cm4]
+# Enable host mode on the 2711 built-in XHCI USB controller.
+# This line should be removed if the legacy DWC2 controller is required
+# (e.g. for USB device mode) or if USB support is not required.
+otg_mode=1
+
+[pi5]
+BOOT_UART=1
+
+[cm5]
+dtoverlay=dwc2,dr_mode=host
+
+[all]
+uart_2ndstage=1
+console=serial0,115200 console=tty1 root=ROOTDEV fsck.repair=yes rootwait
+← Back to Main Documentation
+
+Overview
+
+rpi-image-gen provides a flexible, hierarchical approach to managing
+build variables through multiple configuration sources with clear
+precedence rules. The system is built around the IGconf_ prefix
+namespace and supports both INI and YAML file formats.
+
+Core Architecture
+
+Variable Naming Convention
+
+Excluding environment keys, configuration variables in rpi-image-gen use
+the IGconf_ prefix followed by a structured naming pattern:
+
+    IGconf_<section>_<key>
+
+Where:
+
+- section: Logical grouping (e.g., device, image)
+
+- key: Specific configuration parameter (e.g., class, storage_type,
+  hostname)
+
+Example variables:
+
+    IGconf_device_class=pi5
+    IGconf_device_storage_type=sd
+    IGconf_image_compression=zstd
+
+Layer Variable Declaration
+
+Variables are declared by layer YAML files using metadata headers within
+comment blocks:
+
+    # METABEGIN
+    # X-Env-Layer-Name: rpi5
+    # X-Env-Layer-Category: device
+    # X-Env-Layer-Desc: Raspberry Pi 5 specific device layer
+    #
+    # X-Env-VarPrefix: device
+    #
+    # X-Env-Var-class: pi5
+    # X-Env-Var-class-Desc: Device class
+    # X-Env-Var-class-Required: n
+    # X-Env-Var-class-Valid: keywords:pi5
+    # X-Env-Var-class-Set: y
+    #
+    # X-Env-Var-storage_type: sd
+    # X-Env-Var-storage_type-Desc: Pi5 storage type
+    # X-Env-Var-storage_type-Required: n
+    # X-Env-Var-storage_type-Valid: sd,nvme
+    # X-Env-Var-storage_type-Set: y
+    # METAEND
+
+Variable Declaration Metadata
+
+Each variable declaration includes several metadata fields:
+
+- X-Env-Var-<name>: Default value for the variable
+
+- X-Env-Var-<name>-Desc: Human-readable description
+
+- X-Env-Var-<name>-Required: Whether the variable is required (y/n)
+
+- X-Env-Var-<name>-Valid: Validation rules (keywords, patterns, etc.)
+
+- X-Env-Var-<name>-Set: Variable assignment policy
+
+Variable Prefix
+
+The X-Env-VarPrefix field specifies the section name used in the IGconf_
+namespace:
+
+    X-Env-VarPrefix: device
+
+Results in variables like:
+
+    IGconf_device_class=pi5
+    IGconf_device_storage_type=sd
+
+Configuration File Support
+
+The configuration system supports both INI and YAML file formats with
+automatic format detection based on file extension.
+
+YAML Configuration Format
+
+YAML provides the most flexible configuration format with native support
+for hierarchical data and includes:
+
+    include:
+      file: base.yaml
+
+    env:
+      MYVAR: UNCHANGED
+
+    device:
+      class: pi5
+      storage_type: sd
+      hostname: ${IGconf_device_class}-$(tr -dc 'a-z' < /dev/urandom | head -c 6)
+
+    image:
+      compression: zstd
+      boot_part_size: 200%
+      root_part_size: 300%
+
+INI Configuration Format
+
+INI format provides traditional section-based configuration:
+
+    !include base.cfg
+
+    [env]
+    MYVAR = UNCHANGED
+
+    [device]
+    class = pi5
+    storage_type = sd
+    hostname = ${IGconf_device_class}-$(tr -dc 'a-z' < /dev/urandom | head -c 6)
+
+    [image]
+    compression = zstd
+    boot_part_size = 200%
+    root_part_size = 300%
+
+Configuration Includes
+
+Both formats support including other configuration files to promote
+reusability and modularity. The include precedence order is shown in the
+table below.
+
++-----------+-----------------------------------+------------------------------------+
+| Priority  | Source                            | Description                        |
++===========+===================================+====================================+
+| 1         | Parent directory of the including |                                    |
+| (Highest) | file                              |                                    |
++-----------+-----------------------------------+------------------------------------+
+| 2         | <src dir>/config                  | The source directory if specified  |
+|           |                                   | via the command line               |
++===========+===================================+====================================+
+| 3         | <built-in>/config                 | Default in-tree location, eg       |
+| (Lowest)  |                                   | `/usr/share/rpi-image-gen/config/` |
++===========+===================================+====================================+
+
+YAML Includes
+
+    include:
+      file: shared/base.yaml
+
+INI Includes
+
+    !include shared/base.cfg
+
+Therefore, included files are resolved using:
+
+1.  Parent directory
+
+2.  Search path
+
+Variable Sources and Precedence
+
+The configuration system supports multiple variable sources with a clear
+precedence hierarchy:
+
++-----------+-----------------------------------+-----------------------------+
+| Priority  | Source                            | Description                 |
++===========+===================================+=============================+
+| 1         | Command Line Overrides            | Variables specified after   |
+| (Highest) |                                   | -- on the command line      |
++-----------+-----------------------------------+-----------------------------+
+| 2         | Configuration Files               | INI or YAML configuration   |
+|           |                                   | files                       |
++===========+===================================+=============================+
+| 3         | Layer Defaults                    | Default values declared in  |
+| (Lowest)  |                                   | layer metadata              |
++===========+===================================+=============================+
+
+Command Line Overrides
+
+Variables can be set directly on the command line as overrides after --,
+taking the highest precedence:
+
+    rpi-image-gen build -c config.yaml -- IGconf_device_class=pi5 IGconf_image_compression=xz
+
+Variable Expansion
+
+The configuration system supports variable expansion in configuration
+values using shell-style syntax:
+
+Environment Variable Expansion
+
+    device:
+      name: controllerbox
+      rev: 2
+      hostname: ${IGconf_device_name}-$(uuidgen | cut -d'-' -f1)
+
+    image:
+      assetdir: ${WORKSPACE}/build/assets/${IGconf_device_name}-rev${IGconf_device_rev}
+
+    ssh:
+      pubkey_user1=$(< ${DEPLOY}/device/baseassets/id_rsa.pub)
+      pubkey_only=y
+
+Cross-Reference Expansion
+
+Variables can reference other configuration variables:
+
+    device:
+      class: pi5
+      hostname: ${IGconf_device_class}-server
+
+    image:
+      name: ${IGconf_device_class}-custom-image
+
+Environment Variable Dependencies
+
+Layer dependencies can use environment variable expansion to create
+dynamic dependency resolution:
+
+    # METABEGIN
+    # X-Env-Layer-Name: arch-specific-tools
+    # X-Env-Layer-Requires: base-layer,${ARCH}-toolchain,${DISTRO}-packages
+    # METAEND
+
+This allows layers to dynamically depend on other layers based on
+build-time environment variables:
+
+    # Set environment variables before processing
+    export ARCH=arm64
+    export DISTRO=debian
+
+    # Layer dependencies will be equivalent to:
+    # X-Env-Layer-Requires: base-layer, arm64-toolchain, debian-packages
+
+This feature enables dynamic layer selection. For example, one usage
+could be to use the same layer across different build environments to
+support toolchain selection based on target architecture. By using
+variables in the ’parent’ layer, dynamic dependency resolution pulls in
+an architecture specific toolchain ’child’ layer.
+
+Note
+
+Layer discovery will fail if variables referenced in dependencies are
+not set in the environment.
+
+Important
+
+Environment variable dependencies are evaluated during layer discovery,
+not during layer variable expansion. This ensures dependencies are
+resolved before layer processing begins. Because of this, only variables
+already present in the environment can be used in layer dependencies.
+
+For example:
+
+- System or custom environment variables (e.g., USER, ARCH, DISTRO)
+
+- Configuration file variables or command line overrides
+
+All dependencies are always included, i.e. variable names result in
+actual layer names at build-time. For example, ${ARCH}-toolchain always
+results in a dependency, but the specific layer name depends on the ARCH
+environment variable value.
+
+Expansion Context
+
+During configuration processing, variables are expanded using:
+
+1.  Previously loaded configuration values
+
+2.  System environment variables (for shell-style expansion like
+    ${HOME})
+
+3.  A Strict Policy (using bash under set -eu). This means:
+
+    - errexit (set -e): Exit immediately if any command returns a
+      non-zero exit status, including when variable expansion fails or
+      returns an error.
+
+    - nounset (set -u): Treat unset variables as errors during
+      expansion - attempting to expand a variable that hasn’t been set
+      will exit with an error instead of expanding to an empty string.
+
+    - When these are combined, variable expansion is strict and fails
+      quickly. Any attempt to expand an undefined variable will cause
+      the build to exit immediately.
+
+Note
+
+There may be a need to handle non-alphanumeric characters in config
+files and/or command line arguments. Best practices advise encapsulating
+the text for a more robust approach, even if it’s not always technically
+necessary. For YAML files, use single quotes for literal strings. For
+example password: ’Fo0bar!!’. For INI files, quote values containing
+special characters. For example password = "Fo0bar!!". For command line
+arguments, use single quotes to preserve the literal text. For example
+rpi-image-gen build -c <args> — IGconf_device_user1pass=’Fo0bar!!’.
+
+Conditional Variables
+
+The expansion of variables during configuration processing means it’s
+possible to use conditional expressions to assign variables based on
+other variables via parameter expansion. This provides quite a powerful
+feature for adapting configuration based characteristics or other
+settings.
+
+For example:
+
+    # METABEGIN
+    # X-Env-Layer-Name: image-rescue
+    # X-Env-Layer-Requires: image-base,device-base
+    # X-Env-Layer-Provides: image
+    #
+    # X-Env-VarRequires: IGconf_device_storage_type
+    #
+    # X-Env-VarPrefix: image
+    #
+    # X-Env-Var-ptable_protect: $( ["${IGconf_device_storage_type}" = "emmc"] && echo y || echo n )
+    # X-Env-Var-ptable_protect-Desc: Enable eMMC Power-On Write Protection of the partition table
+    # X-Env-Var-ptable_protect-Required: n
+    # X-Env-Var-ptable_protect-Valid: string
+    # X-Env-Var-ptable_protect-Set: y
+    # METAEND
+
+This results in IGconf_image_ptable_protect=y if
+IGconf_device_storage_type=emmc, else IGconf_image_ptable_protect=n.
+Because configuration variable validation operates on literal values
+prior to expansion, this will only pass validation if the variable being
+assigned is a derivative of type X-Env-Var-X-Valid: string.
+
+Warning
+
+Care must be taken when using parameter expansion if input variables to
+the expression are optional. Due to the strict expansion rules,
+variables referenced in conditional expressions are recommended to use
+the :- fallback syntax to avoid errors.
+
+    # X-Env-VarOptional: IGconf_device_storage_type
+    # X-Env-Var-ptable_protect: $( ["${IGconf_device_storage_type:-}" = "emmc"] && echo y || echo n )
+
+References: GNU Bash Manual
+
+Configuration Loading
+
+Processing Overview
+
+The configuration system processes files using the following steps:
+
+1.  Parse main configuration file - Automatically detects INI or YAML
+    format
+
+2.  Process includes recursively - Follows include directives with
+    circular dependency detection
+
+3.  Apply command line overrides - Processes variables specified after
+    --
+
+4.  Expand variables - Resolves variable references using configuration
+    context
+
+5.  Set environment variables - Applies final values following
+    precedence rules
+
+6.  Generate output - Either loads into environment or writes to file
+
+Command Line Interface
+
+Config Command
+
+The config command provides direct access to configuration
+functionality:
+
+    # Load all sections into environment
+    rpi-image-gen config myconfig.yaml
+
+    # Load specific section
+    rpi-image-gen config myconfig.yaml --section device
+
+    # Write resolved config to file
+    rpi-image-gen config myconfig.yaml --write-to build.env
+
+    # Use command line overrides
+    rpi-image-gen config myconfig.yaml -- IGconf_device_class=pi5 IGconf_image_compression=xz
+
+    # Custom include search paths
+    rpi-image-gen config myconfig.yaml --path "./config:./shared:./templates"
+
+    # Disable variable expansion
+    rpi-image-gen config myconfig.yaml --no-expand
+
+    # Combine options with overrides
+    rpi-image-gen config myconfig.yaml --section device --write-to build.env -- IGconf_device_class=pi5
+
+Config Generation
+
+Generate example configuration files:
+
+    # Generate boilerplate INI and YAML examples
+    rpi-image-gen config --gen
+
+    # Migrate INI to YAML format
+    rpi-image-gen config legacy.cfg --migrate > modern.yaml
+
+Integration with Layer System
+
+Layer Variable Discovery
+
+The configuration system integrates with the layer management system to:
+
+1.  Discover declared variables from layer metadata
+
+2.  Validate variable values against declared constraints
+
+3.  Apply variable policies (immediate, lazy, force, skip)
+
+4.  Resolve variable dependencies between layers
+
+Variable Policies
+
+Variables support different assignment policies:
+
+- immediate: Set the variable if it is currently unset (first-wins
+  strategy). This is the default behavior.
+
+- lazy: Applied after all layers are processed (last-wins strategy).
+  Useful for defaults that can be overridden.
+
+- force: Always overwrite existing environment value, regardless of what
+  was set before.
+
+- skip: Never set the variable.
+
+Refer to the layer documentation for further details.
+
+Layer Build Order
+
+Variables are processed in layer dependency order, ensuring that:
+
+1.  Base layer variables are available to dependent layers
+
+2.  Variable expansion can reference previously set values
+
+3.  Validation occurs with complete variable context
+
+Best Practices
+
+Configuration Organisation
+
+1.  Use base configurations for common settings across builds
+
+2.  Layer-specific overrides in focused configuration files
+
+3.  Environment-specific values in separate configuration files
+
+4.  Runtime overrides via command-line arguments after --
+
+Variable Naming
+
+1.  Follow prefix conventions with logical section grouping
+
+2.  Use descriptive names that indicate purpose and scope
+
+3.  Consistent naming patterns within configuration sections
+
+File Structure
+
+    config/
+    ├── base.yaml              # Common base configuration
+    ├── environments/
+    │   ├── development.yaml   # Development overrides
+    │   ├── staging.yaml      # Staging overrides
+    │   └── production.yaml   # Production overrides
+    └── variants/
+        ├── local.yaml       # Local development settings
+        └── ci.yaml          # CI/CD specific settings
+
+Variable Expansion Security
+
+1.  Validate input in configuration files to prevent injection
+
+2.  Limit variable scope to prevent unintended expansion
+
+3.  Use quotes for values containing special characters
+
+4.  Test expansion in controlled environments before production
+
+Error Handling and Debugging
+
+Common Configuration Issues
+
+- Circular includes: Detected automatically with clear error messages
+
+- Missing include files: Searches all configured paths before failing
+
+- Invalid YAML/INI syntax: Provides line numbers and context
+
+- Undefined variable expansion: Fails fast with variable name
+
+- Section/key conflicts: Resolved by precedence rules
+
+Debugging Configuration
+
+1.  Use --write-to to see resolved variable values
+
+2.  Check precedence with CFG/OVR output prefixes
+
+3.  Validate includes by examining search path messages
+
+4.  Run interactively to allow a pseudo ’dry-run’ stepped flow
+
+5.  Test expansion with simple configuration files
+
+Output Interpretation
+
+Configuration loading outputs show variable sources:
+
+    CFG IGconf_device_class=pi5         # From configuration file
+    OVR IGconf_device_hostname=pi5-test  # From command line override
+
+Layer collection output shows variable policy and evaluated value:
+
+     [SET]  IGconf_device_class=pi5 (layer: rpi5)
+     [SKIP]  IGconf_device_hostname (already set)
+     [LAZY]  IGconf_device_variant=none (layer: device-base)
+
+Migration and Compatibility
+
+INI to YAML Migration
+
+Use the built-in migration tool:
+
+    rpi-image-gen config legacy.cfg --migrate > modern.yaml
+
+The migration tool:
+
+- Preserves include directives with updated syntax
+
+- Maintains section structure and variable relationships
+
+- Updates file extensions in include references
+
+- Adds migration comments for traceability
+
+Backward Compatibility
+
+The configuration system maintains compatibility with:
+
+- Existing INI files through automatic format detection
+
+- Legacy include syntax (!include vs include:)
+
+- Environment variable patterns used by previous versions
+
+- Command-line interfaces with extended functionality
+
+Performance Considerations
+
+Configuration Loading Performance
+
+- Lazy evaluation of variable expansion where possible
+
+- Caching of included files to avoid repeated parsing
+
+- Minimal environment manipulation during loading
+
+- Efficient precedence resolution without redundant checks
+
+Summary
+
+The rpi-image-gen configuration system provides a robust foundation for
+managing complex build configurations through:
+
+- Hierarchical variable organisation with the IGconf_ namespace
+
+- Multiple configuration sources with clear precedence rules
+
+- Flexible file formats (INI and YAML) with include support
+
+- Variable expansion supporting cross-references and environment
+  integration
+
+- Layer system integration for variable discovery and validation
+
+- Command-line tools for configuration management and debugging
+← Back to Main Documentation
+
+IDP (Image Description Provisioning)
+
+IDP enables secure, flexible device provisioning by bridging
+rpi-image-gen with rpi-sb-provisioner using a JSON description of your
+image. IDP supports any partition layout (not just Raspberry Pi OS
+distribution images) which means it’s possible to securely provision
+completely custom images on your Raspberry Pi device.
+
+How it works:
+
+1.  Generate - rpi-image-gen creates an image description JSON file
+
+2.  Send - Client transfers the description to device
+
+3.  Validate - Device verifies compatibility (model, storage
+    requirements, security attributes)
+
+4.  Prepare - Device creates partition tables, LUKS containers, etc.
+
+5.  Provision - Client writes partition images to prepared block devices
+
+IDP acts as a "smart block device creation tool" that prepares device
+storage and orchestrates secure image deployment through a defined
+protocol.
+
+Transport Protocol
+
+IDP was designed to be transport medium agnostic. The current
+implementation uses fastboot as the transport protocol, which allows it
+to interoperate with devices running the pi-gen-micro fastboot gadget.
+
+JSON Structure
+
+The image description is split into two components using a simple
+schema:
+
+- Image layout - partition table and individual image information,
+  sizes, filesystem types, attributes, metadata
+
+- Provisioning map (PMAP) - defines how the image will be provisioned
+  on-device, e.g. partitions to encrypt, security attributes to use
+
+If an image layer is to support IDP, it must declare support of a
+provisioning map in its config settings and install the applicable JSON
+fragment as ${IGconf_image_outputdir}/provisionmap.json. Typically this
+is handled by image layer specific hooks. If installed, rpi-image-gen
+will automatically include the PMAP in the final image description file
+(image.json). Please refer to the individual layer documentation for
+available PMAP options.
+
+Benefits:
+
+- Smart provisioning - Device validates before writing
+
+- Flexible layouts - Support custom partition schemes
+
+- Encryption support - Integrates with LUKSv2, signed boot and industry
+  standard encryption flows
+
+- Secure workflow - Validation at every step
+
+Dependencies
+
+IDP requires fastboot to be installed in the client. On Debian systems,
+this can be installed using `sudo apt install fastboot`. Sparse format
+images are used when writing to device storage and rpi-image-gen image
+layers create sparse images by default using genimage. This avoids
+reliance on any external tooling, such as AOSP utilities. Using sparse
+format means images with lots of empty space can be transferred and
+written to device storage in a much shorter time using fastboot when
+compared with primitive tools such as dd. Other utilities such as
+bmaptool provide a similar, much-improved way for storage handling and
+IO transfer.
+
+Warning
+
+Raspberry Pi provisioning tools such as rpi-sb-provisioner
+(https://github.com/raspberrypi/rpi-sb-provisioner) rely on sparse
+images, so rpi-image-gen ships its own up-to-date genimage to avoid
+compatibility problems seen with older distribution versions.
+
+Usage:
+
+To use IDP without rpi-sb-provisioner:
+
+1.  Become familiar with rpiboot
+    (https://github.com/raspberrypi/usbboot)
+
+2.  Build the pi-gen-micro fastboot gadget
+    (https://github.com/raspberrypi/pi-gen-micro)
+
+3.  Boot the fastboot gadget on the target device
+
+4.  From your client, provision your image on the target device using
+    rpi-image-gen’s helper:
+
+        $ ./bin/idp.sh -f /path/to/image.json
+
+Note
+
+It’s also possible to issue conventional fastboot commands from the
+client to the device. For example, to write a sparse image to device
+storage:
+
+    $ fastboot flash mmcblk0 /path/to/fullimage.sparse
+
+rpi-sb-provisioner will gain support for IDP which will enable seamless
+integration and secure deployment of rpi-image-gen created images on
+your Raspberry Pi device. Refer to the rpi-sb-provisioner documentation
+for further details.
+← Back to Main Documentation
+
+Overview
+
+The rpi-image-gen build process consists of six main stages executed
+sequentially:
+
+1.  Parameter Assembly - Input validation and configuration parsing
+
+2.  Layer Processing - Layer collection, validation, and dependency
+    resolution
+
+3.  Build Preparation - Environment setup and bdebstrap configuration
+
+4.  Filesystem Generation - Filesystem creation followed by hooks and
+    overlays
+
+5.  Image Generation - Disk image creation
+
+6.  Deployment - Installation of build assets
+
+Philosophy
+
+When instructed to use a source directory via the CLI, rpi-image-gen
+prioritises that directory for config files and layers, while still
+allowing references to its built-in resources. Similar to how a C
+compiler searches local directories before system directories (-I.
+-I/usr/include), rpi-image-gen uses a hierarchical search path. This
+allows users to have complete project encapsulation for their
+integration.
+
+Practical Example
+
+    # Local config can include built-in base
+    # File: ./my-project/config/kiosk.yaml
+    include:
+      file: bookworm-minbase.cfg  # Resolves to built-in config
+
+    layer:
+      app: my-kiosk               # Resolves to ./my-project/layer/my-kiosk.yaml
+
+    # Build with mixed local/built-in resources
+    $ rpi-image-gen build -S ./my-project/ -c kiosk.cfg
+
+This philosophy enables a user to have self-contained projects with
+external dependencies.
+
+Stage 1: Parameter Assembly
+
+Purpose
+
+Validate input arguments, parse configuration files, and establish the
+initial environment for subsequent stages.
+
+Activities
+
+- Input Validation and Override Processing: CLI processing
+
+- Config Parsing: Configuration file parsing
+
+- Environment Injection: Path setup, initial internal setup
+
+- Sanity Checks: Validate input sources
+
+Stage 2: Layer Processing
+
+Purpose
+
+Discover, validate, and order all layers specified in the configuration,
+and expand all configuration variables to their final values.
+
+Activities
+
+- Layer Collection: Extract layer references from config
+
+- Layer Validation: Generate layer configuration variables
+
+- Dependency Resolution: Resolve layer build order to determine the
+  build sequence
+
+- Variable Expansion: Resolves configuration variables with defined
+  policy handling
+
+Stage 3: Build Preparation
+
+Purpose
+
+Set up the build environment and assemble bdebstrap parameters with the
+necessary configuration.
+
+Activities
+
+- Path Configuration: Paths updated to allow location of host binaries
+  and tools
+
+- APT Configuration: Configure apt settings including:
+
+  - Key directories
+
+  - Cache settings
+
+  - Proxy settings
+
+  - Package options
+
+- Command Assembly: Constructs the initial bdebstrap command including:
+
+  - Environment variables
+
+  - Target settings
+
+  - All compatible YAML layer files
+
+  - Installing core hook runners for setup, extract, essential,
+    customize, and cleanup phases
+
+Stage 4: Filesystem Generation
+
+Purpose
+
+Create the filesystem and generate the Software Bill of Materials.
+
+Activities
+
+- *Hook*[pre-build.sh]
+
+  - Example Use - Custom validation of pre-build settings
+
+- Filesystem Generation: Execute bdebstrap
+
+- Overlays: Apply static filesystem overlays
+
+- *Hook*[post-build.sh]
+
+  - Example Use - Custom installation of image or device specific
+    assets, eg boot configuration files.
+
+- SBOM: Execute the Software Bill of Materials provider to create the
+  SBOM file.
+
+Stage 5: Image Generation
+
+Purpose
+
+Create disk images from the prepared filesystem using the provider.
+
+Activities
+
+- *Hook*[pre-image.sh]
+
+  - Example Use - Creating genimage templates, setting up image creation
+    resources.
+
+- Image Generation: Execute the image provider to create images.
+
+- *Hook*[post-image.sh]
+
+  - Example Use - Custom packaging, signing with device keys, etc.
+
+Stage 6: Deployment
+
+Purpose
+
+Install output assets from the build to a defined location for
+distribution.
+
+Activities
+
+Install and compress:
+
+- Build: Raw disk and sparse images, filesystem archives
+
+- Audit: SBOM, manifests
+
+Hooks
+
+Important
+
+Hooks are optional but if a hook is to be executed, it must have
+executable permissions for the user performing the build.
+
+Overview
+
+rpi-image-gen supports different classifications of hook, and runs all
+hooks in phases via script bin/runner. Runner is responsible for
+invoking all hook scripts outside of layer declarations and is the
+single entry point every hook runs through. bdebstrap invokes it for
+each lifecycle phase (setup, customize, etc.) and the main script calls
+it for image, SBOM, and deploy phases. Runner:
+
+- Resolves hook locations from tagged specs (IGROOT:*, DEVICE_ASSET:*,
+  VAR:IGconf_*) so the same path resolves regardless of environment
+  (e.g. host vs container).
+
+- Executes phase-specific hooks in a deterministic order.
+
+- Applies optional filesystem overlays during customize.
+
+- Supports fallback hook groups (A|B) so that built-in hooks run when no
+  custom is provided.
+
+- Orchestrates deterministic hook execution with the correct environment
+  and arguments, regardless of where the build runs.
+
+Phases
+
++------------+-----------+----------------+----------------------------------------+
+| Phase      | Context   | Classification | Execution                              |
++============+===========+================+========================================+
+| setup      | bdebstrap | bundle         | After build output directory creation, |
+|            |           |                | before any packages are downloaded or  |
+|            |           |                | installed                              |
++------------+-----------+----------------+----------------------------------------+
+| pre-build  | bdebstrap | single         | Within setup phase                     |
++------------+-----------+----------------+----------------------------------------+
+| extract    | bdebstrap | bundle         | After Essential:yes packages have been |
+|            |           |                | extracted, before installing them      |
++------------+-----------+----------------+----------------------------------------+
+| essential  | bdebstrap | bundle         | After Essential:yes packages have been |
+|            |           |                | installed, before installing remaining |
+|            |           |                | packages                               |
++------------+-----------+----------------+----------------------------------------+
+| customize  | bdebstrap | bundle         | After all packages are installed,      |
+|            |           |                | before cleanup commences               |
++------------+-----------+----------------+----------------------------------------+
+| cleanup    | bdebstrap | bundle         | After customize                        |
++------------+-----------+----------------+----------------------------------------+
+| post-build | main      | single         | After bdebstrap, before sbom           |
++------------+-----------+----------------+----------------------------------------+
+| sbom       | main      | single         | After post-build                       |
++------------+-----------+----------------+----------------------------------------+
+| pre-image  | main      | single         | After sbom, before image generation    |
++------------+-----------+----------------+----------------------------------------+
+| post-image | main      | single         | After image generation                 |
++------------+-----------+----------------+----------------------------------------+
+| finalize   | main      | single         | After sbom and image generation,       |
+|            |           |                | before deploy                          |
++============+===========+================+========================================+
+| deploy     | main      | single         | Final stage                            |
++============+===========+================+========================================+
+
+Hook Classification: bundle
+
+Runner scans for setup*, extract*, essential*, customize*, and cleanup*
+hooks inside bdebstrap/ subdirectories of:
+
+- Device asset directory (DEVICE_ASSET)
+
+- Image asset directory (IMAGE_ASSET)
+
+- Source tree (SRCROOT/bdebstrap)
+
+- Built-in (IGROOT/scripts/bdebstrap)
+
+It executes matching hooks (alphanumeric basename) in that order for
+each phase. Subdirectories aren’t traversed; the file extension is
+ignored.
+
+Hook Classification: single
+
+With the exception of sbom and deploy, all single hooks are customisable
+and optional. Runner scans for <phase>.sh inside:
+
+- Device asset directory (if set)
+
+- Image asset directory (if set)
+
+- Built-in (IGROOT)
+
+- Source tree (SRCROOT)
+
+Execution takes place from the parent directory of the hook.
+
+Overlays
+
+Filesystem overlays are applied during customize. The following overlay
+directories are supported:
+
+- DEVICE_ASSET:device/rootfs-overlay
+
+- IMAGE_ASSET:device/rootfs-overlay
+
+- SRCROOT:rootfs-overlay
+
+Core
+
+rpi-image-gen ships its own hooks to perform generic tasks. Depending on
+requirements, there may not be a need to add custom hooks at these
+stages as the generic hooks execute before SRCROOT hooks.
+
+Device and Image Asset Directory
+
+If a layer sets IGconf_device_assetdir (DEVICE_ASSET) or
+IGconf_image_assetdir (IMAGE_ASSET), Runner automatically looks for
+optional hooks inside those directories:
+
+    <assetdir>/<phase>.sh
+
+If the asset directory isn’t defined, its hooks are skipped.
+
+initramfs
+
+If initramfs-tools(7) is installed in the chroot, rpi-image-gen extends
+the support of initramfs-tools compatible scripts and hooks to image and
+device directories via their sub-directory device/initramfs-tools. If
+present, the entire contents of this directory is recursively copied
+into the chroot. Mode and ownership attributes are preserved.
+Destination files will not be overwritten. This takes place during the
+customize stage of chroot creation and after execution of DEVICE_ASSET
+and IMAGE_ASSET hook bundles.
+
+Interactive Mode
+
+A CLI option allows execution to pause between major operations for user
+confirmation. This may be useful for inspecting log output prior to
+building.
+Top level landing page for rpi-image-gen technical documentation.
+
+For general information, see the project repository.
+
+Viewing Documentation
+
+Online
+
+- Technical Documentation: https://raspberrypi.github.io/rpi-image-gen/
+
+- Project Information: https://github.com/raspberrypi/rpi-image-gen
+
+Offline
+
+The technical documentation HTML pages are browsable offline via
+file:///path/to/page.html.
+
+Documentation Structure
+
+- execution/ Execution flow overview
+
+- config/ Configuration system
+
+- layer/ Layer information and metadata
+
+- provisioning/ Device provisioning information
+
+Terminology
+
+The following terms are used throughout the documentation:
+
+Host The machine on which rpi-image-gen is executing. Analogous to GNU
+Build.
+
+Device The machine on which output files generated by rpi-image-gen will
+execute. Analogous to GNU Host.
+
+Class The Raspberry Pi device hardware model that output files are
+intended to target, e.g. pi4, cm5.
+
+Variant Enables differentiation between devices of the same class, e.g.
+lite.
+
+Package A collection of files and software resources, encapsulated in a
+known format, that constitute part of a larger software system.
+
+Config File defining the variables and attributes that rpi-image-gen
+will use to construct the device filesystem, image, etc.
+
+Image The complete disk layout, including partitioning scheme and
+filesystem structure for an executable and bootable device storage
+medium.
+
+Layer A YAML file in a defined format comprising of a modular,
+composable component that defines specific aspects of your device build.
+
+Hook A shell script that may be optional and which if found, will be run
+at a defined point in a particular flow of execution.
+
+SBOM Software Bill Of Materials
+
+CVE Common Vulnerabilities and Exposures
+Compatibility
+
+This layer installs the 2712 kernel which has a 16kB page size. Some
+libs and apps are/were known to have trouble executing on such a system.
+Depending on your needs, you may require running the v8 kernel (kernel8)
+on your device instead.
+
+References
+
+Raspberry Pi linux kernel documentation
+Compatibility
+
+This layer installs the 2712 kernel which has a 16kB page size. Some
+libs and apps are/were known to have trouble executing on such a system.
+Depending on your needs, you may require running the v8 kernel (kernel8)
+on your device instead.
+
+References
+
+Raspberry Pi linux kernel documentation
+Immutable root and mount points
+
+This system uses an A/B, read‑only root with all writable state on a
+single persistent partition.
+
++------------------+---------------------------------+-------+-------------------------------+
+| Mount point      | Backing                         | Type  | Notes                         |
++==================+=================================+=======+===============================+
+| /                | /dev/disk/by-slot/active/system | ext4  | ro System root (active slot A |
+|                  |                                 |       | or B)                         |
++------------------+---------------------------------+-------+-------------------------------+
+| /boot/firmware   | /dev/disk/by-slot/active/boot   | vfat  | ro Boot files (active slot A  |
+|                  |                                 |       | or B)                         |
++------------------+---------------------------------+-------+-------------------------------+
+| /bootfs          | BOOTFS                          | vfat  | rw Boot metadata              |
++------------------+---------------------------------+-------+-------------------------------+
+| /persistent      | PERSISTENT                      | ext4  | rw Shared persistent storage  |
++------------------+---------------------------------+-------+-------------------------------+
+| /home            | /persistent/home                | bind  | User data shared across slots |
++------------------+---------------------------------+-------+-------------------------------+
+| /var             | /persistent/slots/<slot>/var    | bind  | Per‑slot runtime state        |
+|                  |                                 |       | (systemd, caches, etc.)       |
++==================+=================================+=======+===============================+
+| /var/log/journal | /persistent/log/journal         | bind  | Single log directory used by  |
+|                  |                                 |       | both slots                    |
++==================+=================================+=======+===============================+
+
+- Rationale (immutable root + A/B)
+
+  - Supports delta/incremental OTA updates by treating root as a static
+    image.
+
+  - Reliable rollbacks: slot can be flipped if a new root fails health
+    checks.
+
+  - Reduced write amplification and storage wear, clearer separation of
+    state.
+
+  - Predictable per‑slot state in /var.
+
+  - Shared /home for slot agnostic user storage.
+
+  - Shared journalling: centralised point for device logging.
+
+  - Preserves SBOM accuracy: executing software matches the manifest
+    exactly.
+
+  - Blocks on-device package installs, preventing SBOM drift.
+
+  - Enables auditable, reproducible releases and stronger supply-chain
+    assurances.
+
+- Logging
+
+  - A single persistent journal directory at /persistent/log/journal
+    stores logs from either slot.
+
+  - Journaling is configured for endurance and reliability.
+
+- Machine Identity (systemd)
+
+  - /etc/machine-id is synchronised early with
+    /persistent/common/etc/machine-id using a oneshot unit.
+
+Warning
+
+Slot partition GPT labels are mandatory to associate the immutable root
+with its matching persistent storage.
+
+- Root slots must have stable PARTLABELs: e.g. system_a and system_b.
+
+- At boot, a generator reads the root slot’s PARTLABEL to select
+  /persistent/slots/<slot>/var.
+
+If slot GPT labels are missing/duplicated, /var binding will fail.
+
+If slot GPT labels can’t be guaranteed, this layout is not suitable for
+your device.
+
+Slot Selection (run-time)
+
+Handled entirely by layer rpi-ab-slot-mapper.
+
+Slot Pairing (build-time)
+
+Definition
+
+This layer generates an image which has bit-for-bit identical A/B slot
+members:
+
+- Both a.boot and b.boot contain the exact same vfat filesystem.
+
+- Both a.system and b.system contain the exact same ext4 filesystem.
+
+- Filesystem UUIDs are intentionally identical across slots.
+
+- GPT partition GUIDs (PARTUUID) are unique per partition.
+
+- GPT partition labels (PARTLABEL) are unique per partition.
+
+Rationale and benefits
+
+- Faster image creation: only a single slot pair is produced.
+
+- Simpler updates: only a single slot pair is built, tested, and
+  distributed.
+
+- Update generation: operating on a single slot pair is unambiguous.
+
+- Smaller CI/storage footprint: fewer images to store.
+
+Requirements and constraints
+
+- Does not use UUID= anywhere. Duplicate filesystem UUIDs make
+  /dev/disk/by-uuid/* ambiguous.
+
+- Uses stable identifiers instead, e.g.
+  /dev/disk/by-slot/{active,other}/{boot,system}.
+
+Encrypted (LUKS) Provisioning Map layouts
+
+- Identical content inside LUKS is supported. Slot mapping can use GPT
+  labels or static map triplets to identify mapper:<name>:<part> slot
+  components.
+Purpose
+
+Helper scripts in this directory are invoked by the layer manager when a
+layer declares X-Env-Layer-Type: dynamic. Each generator reads a
+template layer file ($1) and writes the rendered result to the output
+file path ($2). This is a reference for each script. The layer manager
+guarantees that the input file and parent directory of the output file
+are valid.
+
+Available Generators
+
++--------+-------------------------------+-------------------------------+
+| Script | Purpose                       | Notes                         |
++========+===============================+===============================+
+| envcp  | <PLACEHOLDER> replacement     | If DEBIAN_SNAPSHOT_TS is      |
+|        | using environment variables   | unset, <SNAPSHOT> is derived  |
+|        |                               | from the current UTC time.    |
++========+===============================+===============================+
+
+Adding New Generators
+
+1.  Drop the executable script in this directory.
+
+2.  Document it in the table above.
+This example demonstrates using rpi-image-gen to build a filesystem
+tarball that provides the foundation of a container image whose purpose
+is to be a reusable vehicle with which to customise and cross-compile
+the Linux kernel. Unless explicitly stated, run all steps on a build
+server (for example, a high-performance x86_64 machine) because building
+the kernel from source requires significant CPU and I/O resources.
+
+The container offers a reusable, self-contained build environment
+suitable for CI pipelines and varied development workflows. By running
+tools in the container rather than on the host, you can reuse the
+environment at any time and maintain host isolation.
+
+Container Setup and Kernel Build
+
+Filesystem foundation
+
+Build the filesystem tarball using this configuration. The result is a
+compressed tar archive with binaries whose architecture matches that of
+the build machine. This file forms the base of the container image.
+
+    $ rpi-image-gen build -c ./examples/custom_kernel/config/kbuild.yaml
+
+Prepare kernel source
+
+Prepare the Linux source tree. This can be from git, a local directory,
+tarball extraction, etc. This location will be bind-mounted into the
+container.
+
+    $ git clone --depth=1 --branch rpi-6.12.y https://github.com/raspberrypi/linux ./work/linux
+
+Container image creation
+
+Using podman, import the tarball to use as the container image.
+
+    $ podman import ./work/build-vehicles/deb12-kbuild.tgz chroot:deb12-kbuild
+
+Note
+
+It’s possible to use other container managers instead of podman, e.g.
+docker.
+
+Run the container
+
+Start the container, making the kernel source available to it.
+
+    $ podman run -it --userns=keep-id -e HOME=/home/build -w /home/build --user build -v ./work/:/home/build/work chroot:deb12-kbuild /bin/bash -l
+
+--userns=keep-id This sets the user namespace mode for the container,
+mapping the user on the host build machine to the user in the container.
+Without such a mapping, the user in the container won’t be able to write
+to the bind-mounted directory.
+
+/home/build is the home account of the build user (see layer
+build-user).
+
+You’re now running in the container:
+
+    build@b2de4ac17059:~$
+
+Configure and build the kernel
+
+Change directory to the kernel source and configure it.
+
+    build@b2de4ac17059:~$ cd ./work/linux
+    build@b2de4ac17059:~/work/linux$ make KERNEL=kernel_2712 ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE bcm2712_defconfig
+
+Use menuconfig to tailor the kernel to your needs, then build.
+
+    build@b2de4ac17059:~/work/linux$ make KERNEL=kernel_2712 ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE -j$(nproc) Image modules dtbs
+
+Note
+
+The rpi-image-gen toolchain layers ensure ARCH and CROSS_COMPILE are set
+appropriately in the container run-time environment.
+
+Package the kernel
+
+Create a Debian package bundle using the mechanism provided by the
+kernel source.
+
+    build@b2de4ac17059:~/work/linux$ make ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE -j$(nproc) bindeb-pkg DPKG_FLAGS=-d
+
+Packages are created in the parent directory.
+
+Rebuilding the kernel
+
+Exit the container if you’re finished building …
+
+    build@b2de4ac17059:~/work/linux$ exit
+    logout
+
+…Or, if you want to rerun menuconfig and rebuild (or modify the source
+and rebuild, etc.), you can restart the container and resume where you
+left off.
+
+    $ podman ps -a
+    CONTAINER ID  IMAGE                          COMMAND       CREATED         STATUS                         PORTS       NAMES
+    b2de4ac17059  localhost/chroot:deb12-kbuild  /bin/bash -l  22 minutes ago  Exited (0) About a minute ago              infallible_leavitt
+
+    $ podman start b2de4ac17059
+    b2de4ac17059
+
+    $ podman exec -it b2de4ac17059 /bin/bash -l
+    build@b2de4ac17059:~$ cd ./work/linux/
+    build@b2de4ac17059:~/work/linux$ make KERNEL=kernel_2712 ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE -j$(nproc) menuconfig
+
+
+    *** End of the configuration.
+    *** Execute 'make' to start the build or try 'make help'.
+
+    build@b2de4ac17059:~/work/linux$ make KERNEL=kernel_2712 ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE -j$(nproc) Image modules dtbs
+      CALL    scripts/checksyscalls.sh
+      ....
+      ....
+
+Repackage, rebuild, etc., as appropriate.
+
+Tip
+
+When first running the container, specify a name such as --name
+kernel-build so it can be restarted with podman start -ai kernel-build
+instead of using the container ID.
+
+Install and Image Creation
+
+The packaging stage will have created the following.
+
+    $ ls -1 ./work/*.deb
+    ./work/linux-headers-6.12.45-v8-16k_6.12.45-2_arm64.deb
+    ./work/linux-image-6.12.45-v8-16k_6.12.45-2_arm64.deb
+    ./work/linux-libc-dev_6.12.45-2_arm64.deb
+
+These constitute:
+
+1.  Headers and build files for compiling out-of-tree kernel modules
+    against this exact kernel.
+
+2.  The kernel image plus its modules, device tree binaries, metadata,
+    etc.
+
+3.  Userspace kernel UAPI headers.
+
+Installing your local linux-image deb rather than one from apt as part
+of an rpi-image-gen image build is straight-forward. However, there are
+a few things to be aware of:
+
+- If it’s a custom version, hooks that are usually triggered by an
+  official Raspberry Pi linux-image pkg install (e.g. those in pkg
+  raspi-firmware) may not run.
+
+- You may not require or wish certain Raspberry Pi pkg hooks to run.
+  Disabling that functionality can usually be done by overriding options
+  (e.g. /etc/default/raspi-firmware).
+
+- When using a custom kernel package, users become responsible for
+  installation tasks that are normally handled automatically by official
+  Raspberry Pi packages, such as copying Device Tree blobs to the boot
+  firmware’s expected location.
+
+- It may be necessary to prevent installation of other kernel packages
+  to prevent them from overwriting your custom kernel’s boot files,
+  Device Tree blobs, or kernel modules.
+
+Image build with a custom kernel package
+
+Installation of the custom linux-image deb can be performed using dpkg
+via a bdebstrap hook. See bdebstrap/customize01-kernelinst. Ensure the
+linux-image-* package generated by your build is copied to the root of
+this example directory, and that its name matches the script before
+running the rpi-image-gen command to create the final image.
+
+    $ rpi-image-gen build -S ./examples/custom_kernel/ -c example.yaml
+
+There is no initramfs generated or installed in this image, so when
+booted on your device the kernel will start and mount the root device
+immediately. The example includes apt pinning syntax to prevent any
+linux-image-* packages from being installed via apt which would conflict
+with files installed by the local package. This is purely for
+illustrative purposes but may be relevant if the intention is to only
+install Linux kernel packages locally or at build time.
+console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 fsck.repair=yes rootwait
+# For more options and information see
+# http://rptl.io/configtxt
+# Some settings may impact device functionality. See link above for details
+
+# Uncomment some or all of these to enable the optional hardware interfaces
+#dtparam=i2c_arm=on
+#dtparam=i2s=on
+#dtparam=spi=on
+
+# Enable audio (loads snd_bcm2835)
+dtparam=audio=on
+
+# Additional overlays and parameters are documented
+# /boot/firmware/overlays/README
+
+# Automatically load overlays for detected cameras
+camera_auto_detect=1
+
+# Automatically load overlays for detected DSI displays
+display_auto_detect=1
+
+# Automatically load initramfs files, if found
+auto_initramfs=1
+
+# Enable DRM VC4 V3D driver
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+
+# Don't have the firmware create an initial video= setting in cmdline.txt.
+# Use the kernel's default instead.
+disable_fw_kms_setup=1
+
+# Disable compensation for displays with overscan
+disable_overscan=1
+
+# Run as fast as firmware / board allows
+arm_boost=1
+
+[pi5]
+BOOT_UART=1
+
+[cm5]
+dtoverlay=dwc2,dr_mode=host
+console=ttyAMA10,115200 root=/dev/disk/by-label/ROOT rootfstype=ext4 fsck.repair=yes rootwait
+console=serial0,115200 root=ROOTDEV fsck.repair=yes rootwait
