@@ -623,7 +623,9 @@
                         link.style.textDecoration = 'none';
                         link.href = c.url || '#';
                         link.target = '_blank';
-                        link.innerText = `[source] ${c.title}`;
+                        // Include citation number if available
+                        const citationNum = c.id ? `[${c.id}] ` : '';
+                        link.innerText = `${citationNum}${c.title}`;
                         if (!c.url) {
                             link.style.color = '#888';
                             link.style.cursor = 'default';
