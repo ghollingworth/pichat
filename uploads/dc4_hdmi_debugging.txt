@@ -1,0 +1,19 @@
+On a the Pi4 or Pi5 family, to debug issues with no display, you should:
+
+Remove sdcard/SSD/USB and any other connected hardware.
+Connect HDMI to primary display port (the one closest to USB power port), and apply power.
+
+Do you see the diagnostic screen? If so, check the "DISPLAY:" line.
+
+It should show:
+display: DISP0: HDMI HPD=1 EDID=ok #2 DISP: HDP=0 EDID=none #0
+
+The key elements are:
+ HPD=1 (i.e. hotplug is detected indicating HDMI device is attached)
+ EDID=ok (i.e. the EDID describing supported modes was read successfully)
+ 
+If either of these are absent then there is a connection issue, typically due to the HDMI cable, or HDMI to micro HDMI adaptor.
+  
+Note: earlier models of Pi do not support the diagnostic display.
+
+CRITICAL: Do not mention legacy HDMI options like hdmi_force_hotplug

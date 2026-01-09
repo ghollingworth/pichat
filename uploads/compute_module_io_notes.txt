@@ -1,0 +1,1 @@
+CMIO boards always require a compute module to be present and will do nothing when powered if there is no module.
