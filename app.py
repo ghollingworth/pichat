@@ -4,6 +4,8 @@ import tarfile
 import shutil
 import mimetypes
 import re
+import json
+from bisect import bisect_right
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from google import genai
@@ -11,6 +13,7 @@ from google.genai import types
 from dotenv import load_dotenv
 import tempfile
 import traceback
+from datetime import datetime
 
 load_dotenv()
 
@@ -28,6 +31,7 @@ SYSTEM_INSTRUCTION = "You are a helpful and expert Raspberry Pi assistant. "
 SYSTEM_INSTRUCTION += "Your goal is to provide accurate, clear, and safe instructions about Raspberry Pi hardware and software. "
 SYSTEM_INSTRUCTION += "Use the provided knowledge base to ground your answers. If the information is not in the knowledge base, state that you don't know rather than making up information. Be concise but thorough. "
 UPLOAD_FOLDER = 'uploads'
+SYSTEM_INSTRUCTIONS_FILE = 'system_instructions.json'
 
 def extract_url_from_file(file_path):
     """Scans the file for a line starting with 'URL: ' and returns the URL."""
@@ -49,6 +53,233 @@ def extract_url_from_file(file_path):
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+def load_custom_instructions():
+    """Load custom system instructions from JSON file."""
+    if os.path.exists(SYSTEM_INSTRUCTIONS_FILE):
+        try:
+            with open(SYSTEM_INSTRUCTIONS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading custom instructions: {e}")
+            return []
+    return []
+
+def save_custom_instructions(instructions):
+    """Save custom system instructions to JSON file."""
+    try:
+        with open(SYSTEM_INSTRUCTIONS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(instructions, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Error saving custom instructions: {e}")
+        return False
+
+def _build_line_index(text):
+    """Return list of (start_offset, end_offset) for each line."""
+    lines = text.splitlines(keepends=True)
+    line_ranges = []
+    offset = 0
+    for line in lines:
+        start = offset
+        offset += len(line)
+        line_ranges.append((start, offset))
+    if not lines:
+        line_ranges.append((0, 0))
+    return line_ranges
+
+def _offset_to_line(line_ranges, offset):
+    """Map a character offset to a 1-based line number."""
+    if not line_ranges:
+        return 1
+    starts = [start for start, _ in line_ranges]
+    index = bisect_right(starts, max(0, offset)) - 1
+    if index < 0:
+        return 1
+    if index >= len(line_ranges):
+        return len(line_ranges)
+    return index + 1
+
+def extract_markdown_blocks(markdown_text):
+    """Extract contiguous non-empty line blocks with line ranges."""
+    if markdown_text is None:
+        markdown_text = ""
+    lines = markdown_text.splitlines()
+    blocks = []
+    block_start = None
+    for idx, line in enumerate(lines, start=1):
+        if line.strip():
+            if block_start is None:
+                block_start = idx
+        else:
+            if block_start is not None:
+                blocks.append({"start_line": block_start, "end_line": idx - 1})
+                block_start = None
+    if block_start is not None:
+        blocks.append({"start_line": block_start, "end_line": len(lines)})
+    return blocks
+
+def map_supports_to_lines(markdown_text, grounding_supports):
+    """Add start_line/end_line for each grounding support using offsets."""
+    if markdown_text is None:
+        markdown_text = ""
+    line_ranges = _build_line_index(markdown_text)
+    supports_with_lines = []
+    for support in grounding_supports or []:
+        if isinstance(support, dict):
+            segment = support.get("segment") or {}
+            start_offset = segment.get("start_index", 0)
+            end_offset = segment.get("end_index", len(markdown_text))
+        else:
+            segment = getattr(support, "segment", None)
+            if segment and getattr(segment, "start_index", None) is not None:
+                start_offset = segment.start_index
+            else:
+                start_offset = 0
+            if segment and getattr(segment, "end_index", None) is not None:
+                end_offset = segment.end_index
+            else:
+                end_offset = len(markdown_text)
+        supports_with_lines.append({
+            "support": support,
+            "start_offset": start_offset,
+            "end_offset": end_offset,
+            "start_line": _offset_to_line(line_ranges, start_offset),
+            "end_line": _offset_to_line(line_ranges, end_offset),
+        })
+    return supports_with_lines
+
+def render_markdown_with_citations(markdown_text, grounding_supports):
+    """
+    Convert markdown to HTML and append citation links at the end of the line
+    corresponding to each grounding support's end offset.
+    """
+    if markdown_text is None:
+        markdown_text = ""
+    blocks = extract_markdown_blocks(markdown_text)
+    supports_with_lines = map_supports_to_lines(markdown_text, grounding_supports)
+
+    lines = markdown_text.splitlines()
+    line_citations = {}
+    for item in supports_with_lines:
+        support = item["support"]
+        line_no = item["end_line"]
+        url = None
+        title = None
+        citation_urls = None
+        if isinstance(support, dict):
+            citation_urls = support.get("citation_urls")
+        elif hasattr(support, "citation_urls"):
+            citation_urls = support.citation_urls
+        if citation_urls:
+            first = citation_urls[0]
+            if isinstance(first, dict):
+                url = first.get("url")
+                title = first.get("title")
+            else:
+                url = getattr(first, "url", None)
+                title = getattr(first, "title", None)
+        if url:
+            line_citations.setdefault(line_no, []).append({
+                "url": url,
+                "title": title,
+            })
+
+    # Merge identical citations across consecutive lines by keeping them
+    # on the last line of each consecutive block.
+    if line_citations:
+        sorted_lines = sorted(line_citations.keys())
+        last_line_for_url = {}
+        for line_no in sorted_lines:
+            citations = line_citations.get(line_no, [])
+            if not citations:
+                continue
+            kept = []
+            for citation in citations:
+                url = citation.get("url")
+                if not url:
+                    continue
+                prev_line = last_line_for_url.get(url)
+                if prev_line is not None and prev_line == line_no - 1:
+                    # Remove from previous line, keep on current line
+                    line_citations[prev_line] = [
+                        c for c in line_citations[prev_line]
+                        if c.get("url") != url
+                    ]
+                kept.append(citation)
+                last_line_for_url[url] = line_no
+            line_citations[line_no] = kept
+
+    for line_no, citations in line_citations.items():
+        if 1 <= line_no <= len(lines):
+            suffix_parts = []
+            for idx, citation in enumerate(citations, start=1):
+                label = f"{idx}"
+                link = f"[{label}]({citation['url']})"
+                suffix_parts.append(link)
+            lines[line_no - 1] = lines[line_no - 1].rstrip() + " " + " ".join(suffix_parts)
+
+    annotated_markdown = "\n".join(lines)
+    try:
+        import importlib
+        markdown_it = importlib.import_module("markdown_it")
+        markdown_it_class = getattr(markdown_it, "MarkdownIt")
+    except Exception as exc:
+        raise ImportError("markdown-it-py is required to render markdown to HTML") from exc
+    html = markdown_it_class("commonmark").render(annotated_markdown)
+
+    return {
+        "markdown": annotated_markdown,
+        "html": html,
+        "blocks": blocks,
+        "supports": [
+            {
+                "start_line": item["start_line"],
+                "end_line": item["end_line"],
+                "start_offset": item["start_offset"],
+                "end_offset": item["end_offset"],
+            }
+            for item in supports_with_lines
+        ],
+    }
+
+def _annotate_text_with_support_brackets(text, grounding_supports):
+    """Insert [ at start offsets and ] at end offsets for debugging."""
+    if text is None:
+        text = ""
+    supports_with_lines = map_supports_to_lines(text, grounding_supports)
+    insertions = []
+    for item in supports_with_lines:
+        insertions.append((item["start_offset"], "["))
+        insertions.append((item["end_offset"], "]"))
+    insertions.sort(key=lambda x: (x[0], 0 if x[1] == "[" else 1))
+    result = []
+    last = 0
+    for offset, marker in insertions:
+        offset = max(0, min(offset, len(text)))
+        if offset < last:
+            continue
+        result.append(text[last:offset])
+        result.append(marker)
+        last = offset
+    result.append(text[last:])
+    return "".join(result)
+
+def _get_chunk_debug_text(chunk):
+    """Best-effort extraction of chunk text/snippet for debugging."""
+    if hasattr(chunk, 'retrieved_context') and chunk.retrieved_context:
+        rc = chunk.retrieved_context
+        for field in ("text", "content", "snippet"):
+            value = getattr(rc, field, None)
+            if value:
+                return value
+    if hasattr(chunk, 'web') and chunk.web:
+        web = chunk.web
+        for field in ("snippet", "text", "content"):
+            value = getattr(web, field, None)
+            if value:
+                return value
+    return None
 
 def get_or_create_store():
     """Finds or creates the persistent FileSearchStore."""
@@ -95,6 +326,7 @@ def list_files():
             })
         return jsonify(files)
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/files/<path:file_id>', methods=['GET'])
@@ -388,6 +620,105 @@ def get_system_instruction():
     """Returns the base system instruction for editing."""
     return jsonify({"system_instruction": SYSTEM_INSTRUCTION})
 
+@app.route('/api/system-instructions', methods=['GET'])
+def get_all_system_instructions():
+    """Returns all system instructions (default + custom)."""
+    custom_instructions = load_custom_instructions()
+    
+    # Build response with default first, then custom ones
+    result = [
+        {
+            "id": "default",
+            "name": "Default",
+            "instruction": SYSTEM_INSTRUCTION,
+            "is_default": True
+        }
+    ]
+    
+    for custom in custom_instructions:
+        result.append({
+            "id": custom.get("id"),
+            "name": custom.get("name"),
+            "instruction": custom.get("instruction"),
+            "is_default": False,
+            "created_at": custom.get("created_at")
+        })
+    
+    return jsonify({"instructions": result})
+
+@app.route('/api/system-instructions', methods=['POST'])
+def create_system_instruction():
+    """Creates a new custom system instruction."""
+    data = request.json
+    name = data.get('name', '').strip()
+    instruction = data.get('instruction', '').strip()
+    
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    if not instruction:
+        return jsonify({"error": "Instruction is required"}), 400
+    
+    custom_instructions = load_custom_instructions()
+    
+    # Generate a unique ID
+    new_id = f"custom_{int(datetime.now().timestamp() * 1000)}"
+    
+    new_instruction = {
+        "id": new_id,
+        "name": name,
+        "instruction": instruction,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    custom_instructions.append(new_instruction)
+    
+    if save_custom_instructions(custom_instructions):
+        return jsonify(new_instruction), 201
+    else:
+        return jsonify({"error": "Failed to save instruction"}), 500
+
+@app.route('/api/system-instructions/<instruction_id>', methods=['DELETE'])
+def delete_system_instruction(instruction_id):
+    """Deletes a custom system instruction."""
+    if instruction_id == "default":
+        return jsonify({"error": "Cannot delete default instruction"}), 400
+    
+    custom_instructions = load_custom_instructions()
+    original_count = len(custom_instructions)
+    custom_instructions = [inst for inst in custom_instructions if inst.get("id") != instruction_id]
+    
+    if len(custom_instructions) == original_count:
+        return jsonify({"error": "Instruction not found"}), 404
+    
+    if save_custom_instructions(custom_instructions):
+        return jsonify({"message": "Instruction deleted successfully"}), 200
+    else:
+        return jsonify({"error": "Failed to delete instruction"}), 500
+
+@app.route('/api/system-instructions/<instruction_id>', methods=['GET'])
+def get_system_instruction_by_id(instruction_id):
+    """Gets a specific system instruction by ID."""
+    if instruction_id == "default":
+        return jsonify({
+            "id": "default",
+            "name": "Default",
+            "instruction": SYSTEM_INSTRUCTION,
+            "is_default": True
+        })
+    
+    custom_instructions = load_custom_instructions()
+    for inst in custom_instructions:
+        if inst.get("id") == instruction_id:
+            return jsonify({
+                "id": inst.get("id"),
+                "name": inst.get("name"),
+                "instruction": inst.get("instruction"),
+                "is_default": False,
+                "created_at": inst.get("created_at")
+            })
+    
+    return jsonify({"error": "Instruction not found"}), 404
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Asks a question grounded in the FileSearchStore."""
@@ -396,7 +727,6 @@ def chat():
     
     data = request.json
     message = data.get('message')
-    use_bbcode = data.get('bbcode', False)
     custom_instruction = data.get('system_instruction', '').strip()
     
     if not message:
@@ -404,20 +734,10 @@ def chat():
 
     # Use the custom instruction if provided, otherwise fall back to base
     instruction = custom_instruction if custom_instruction else SYSTEM_INSTRUCTION
-    if use_bbcode:
-        instruction += (
-            "\n\nCRITICAL FORMATTING RULES FOR phpBB:\n"
-            "1. NEVER use Markdown (no backticks `code`, no stars **bold**, etc.).\n"
-            "2. phpBB [code] tags are BLOCK-LEVEL ONLY. Never use them inside a sentence.\n"
-            "3. For inline code (filenames, short commands), use [b]bold[/b] or [i]italics[/i] instead of [code].\n"
-            "4. Use [code][/code] ONLY for multi-line blocks of code or terminal output.\n"
-            "5. Use [b] for bold, [i] for italics, and [url=...] for links.\n"
-            "6. Wrap your ENTIRE response in a single [quote] tag."
-        )
-
     try:
+       
         response = client.models.generate_content(
-            model='gemini-3-flash-preview',
+            model='gemini-2.5-flash',
             contents=message,
             config=types.GenerateContentConfig(
                 system_instruction=instruction,
@@ -430,119 +750,65 @@ def chat():
                 ]
             )
         )
+        grounding_supports = []
+        if response.candidates and response.candidates[0].grounding_metadata:
+            gm = response.candidates[0].grounding_metadata
+            doc_list = list(client.file_search_stores.documents.list(parent=current_store.name))
+            doc_url_by_title = {}
+            for doc in doc_list:
+                url = None
+                if doc.custom_metadata:
+                    for item in doc.custom_metadata:
+                        if item.key == 'source_url':
+                            url = getattr(item, 'string_value', None)
+                            break
+                if url:
+                    doc_url_by_title[doc.display_name] = url
 
-        # Process citations/grounding metadata and insert inline links
-        citations = []
-        annotated_answer = response.text
-        citation_map = {}  # Map chunk index to citation data
-        
-        try:
-            if response.candidates and response.candidates[0].grounding_metadata:
-                gm = response.candidates[0].grounding_metadata
-                
-                # First, build a map of chunk indices to citation data
-                if hasattr(gm, 'grounding_chunks') and gm.grounding_chunks:
-                    seen_urls = {}
-                    citation_id = 1
-                    
-                    for chunk_idx, chunk in enumerate(gm.grounding_chunks):
-                        title = None
-                        url = None
-                        
-                        if hasattr(chunk, 'web') and chunk.web:
-                            title = chunk.web.title
-                            url = chunk.web.uri
-                        elif hasattr(chunk, 'retrieved_context') and chunk.retrieved_context:
-                            rc = chunk.retrieved_context
-                            title = getattr(rc, 'title', None)
-                            if title:
-                                # Lookup the document to get the display name and custom URL
-                                try:
-                                    doc_list = client.file_search_stores.documents.list(parent=current_store.name)
-                                    for doc in doc_list:
-                                        if doc.display_name == title:
-                                            if doc.custom_metadata:
-                                                for item in doc.custom_metadata:
-                                                    if item.key == 'source_url':
-                                                        url = getattr(item, 'string_value', None)
-                                                        break
-                                except Exception as e:
-                                    print(f"Warning: Could not fetch details for citation {title}: {e}")
-                        
-                        if title:
-                            # Use URL as key to avoid duplicates, or title if no URL
-                            key = url if url else title
-                            if key not in seen_urls:
-                                citation_map[chunk_idx] = {
+            if hasattr(gm, 'grounding_supports') and gm.grounding_supports:
+                for support in gm.grounding_supports:
+                    segment = getattr(support, 'segment', None)
+                    if not segment:
+                        continue
+                    citation_urls = []
+                    seen = set()
+                    if support.grounding_chunk_indices and hasattr(gm, 'grounding_chunks'):
+                        for chunk_idx in support.grounding_chunk_indices:
+                            if chunk_idx >= len(gm.grounding_chunks):
+                                continue
+                            chunk = gm.grounding_chunks[chunk_idx]
+                            title = None
+                            url = None
+                            if hasattr(chunk, 'web') and chunk.web:
+                                title = getattr(chunk.web, 'title', None)
+                                url = getattr(chunk.web, 'uri', None)
+                            elif hasattr(chunk, 'retrieved_context') and chunk.retrieved_context:
+                                rc = chunk.retrieved_context
+                                title = getattr(rc, 'title', None)
+                                url = doc_url_by_title.get(title) or getattr(rc, 'uri', None)
+                            key = f"{title}|{url}"
+                            if url and key not in seen:
+                                seen.add(key)
+                                citation_urls.append({
                                     "title": title,
                                     "url": url,
-                                    "id": citation_id
-                                }
-                                seen_urls[key] = citation_id
-                                citations.append({"title": title, "url": url, "id": citation_id})
-                                citation_id += 1
-                            else:
-                                # Map this chunk to existing citation
-                                citation_map[chunk_idx] = {
-                                    "title": title,
-                                    "url": url,
-                                    "id": seen_urls[key]
-                                }
-                
-                # Now use grounding_supports to insert inline citations
-                if hasattr(gm, 'grounding_supports') and gm.grounding_supports and citation_map:
-                    # Sort supports by end_index (descending) so we insert from end to start
-                    # This prevents index shifting issues
-                    supports = sorted(gm.grounding_supports, key=lambda s: s.segment.end_index if s.segment else 0, reverse=True)
-                    
-                    for support in supports:
-                        if not support.segment:
-                            continue
-                            
-                        segment = support.segment
-                        end_idx = segment.end_index
-                        
-                        # Get the citation IDs for the chunks that support this segment
-                        citation_ids = set()
-                        if support.grounding_chunk_indices:
-                            for chunk_idx in support.grounding_chunk_indices:
-                                if chunk_idx in citation_map:
-                                    citation_ids.add(citation_map[chunk_idx]["id"])
-                        
-                        if citation_ids:
-                            # Create citation links
-                            if use_bbcode:
-                                # BBCode format: [url=...][1][/url]
-                                links = []
-                                for cid in sorted(citation_ids):
-                                    citation = next((c for c in citations if c["id"] == cid), None)
-                                    if citation and citation["url"]:
-                                        links.append(f'[url={citation["url"]}][{cid}][/url]')
-                                    elif citation:
-                                        links.append(f'[{cid}]')
-                                link_text = ' ' + ' '.join(links) if links else ''
-                            else:
-                                # HTML format: <a href="...">[1]</a>
-                                links = []
-                                for cid in sorted(citation_ids):
-                                    citation = next((c for c in citations if c["id"] == cid), None)
-                                    if citation and citation["url"]:
-                                        links.append(f'<a href="{citation["url"]}" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: bold;" title="{citation["title"]}">[{cid}]</a>')
-                                    elif citation:
-                                        links.append(f'<span style="color: var(--primary); font-weight: bold;" title="{citation["title"]}">[{cid}]</span>')
-                                link_text = ' ' + ' '.join(links) if links else ''
-                            
-                            # Insert the citation link at the end of the segment
-                            if end_idx <= len(annotated_answer):
-                                annotated_answer = annotated_answer[:end_idx] + link_text + annotated_answer[end_idx:]
+                                })
+                    grounding_supports.append({
+                        "segment": {
+                            "start_index": getattr(segment, "start_index", 0),
+                            "end_index": getattr(segment, "end_index", len(response.text)),
+                        },
+                        "citation_urls": citation_urls,
+                    })
 
-        except Exception as e:
-            print(f"Error processing grounding metadata: {e}")
-            traceback.print_exc()
-
+        answer_text = response.text or ""
+        rendered = render_markdown_with_citations(answer_text, grounding_supports)
         return jsonify({
-            "answer": annotated_answer,
-            "citations": citations
+            "answer": rendered["markdown"],
+            "answer_raw": answer_text,
+            "html": rendered["html"],
+            "blocks": rendered["blocks"],
+            "supports": rendered["supports"],
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

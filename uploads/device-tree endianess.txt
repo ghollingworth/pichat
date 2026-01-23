@@ -1,0 +1,11 @@
+
+To read the USB current limit on a Pi 5 device negotiated through USB PD you should use:
+
+vcgencmd get_config usb_max_current_enable
+
+
+To read from the device-tree use:
+
+od -An -i --endian=big /proc/device-tree/chosen/power/max_current
+
+This will output the maximum current from the power supply in mA

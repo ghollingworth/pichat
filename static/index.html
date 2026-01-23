@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PiChat - Raspberry Pi Assistant</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #c51a4a; /* Raspberry Pi redish color */
@@ -144,68 +143,14 @@
             background-color: #e4e6eb;
             color: black;
             position: relative;
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            max-width: 100%;
         }
-        .bot-message h1,
-        .bot-message h2,
-        .bot-message h3 {
-            margin-top: 1em;
-            margin-bottom: 0.5em;
-            font-weight: bold;
-        }
-        .bot-message h1 { font-size: 1.5em; }
-        .bot-message h2 { font-size: 1.3em; }
-        .bot-message h3 { font-size: 1.1em; }
-        .bot-message p {
-            margin: 0.5em 0;
-        }
-        .bot-message ul,
-        .bot-message ol {
-            margin: 0.5em 0;
-            padding-left: 1.5em;
-        }
-        .bot-message li {
-            margin: 0.25em 0;
-        }
-        .bot-message code {
-            background-color: rgba(0, 0, 0, 0.1);
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: monospace;
-            font-size: 0.9em;
-        }
-        .bot-message pre {
-            background-color: rgba(0, 0, 0, 0.05);
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin: 0.5em 0;
-            white-space: pre;
-        }
-        .bot-message pre code {
-            background-color: transparent;
-            padding: 0;
-        }
-        .bot-message blockquote {
-            border-left: 3px solid #ccc;
-            margin: 0.5em 0;
-            padding-left: 1em;
-            color: #666;
-        }
-        .bot-message strong {
-            font-weight: bold;
-        }
-        .bot-message em {
-            font-style: italic;
-        }
-        .copy-bbcode-btn {
-            font-size: 10px;
-            padding: 4px 8px;
-            margin-top: 8px;
-            background: #2f3542;
-            opacity: 0.7;
-        }
-        .copy-bbcode-btn:hover {
-            opacity: 1;
+        .bot-message-content {
+            flex: 1;
+            min-width: 0;
         }
         #chat-input-area {
             display: flex;
@@ -335,11 +280,6 @@
             </div>
         </div>
         <div id="chat-input-area">
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; display: flex; align-items: center; gap: 5px;">
-                    <input type="checkbox" id="bbcode-mode"> phpBB Mode
-                </label>
-            </div>
             <input type="text" id="chat-input" placeholder="e.g. How do I enable I2C on a Pi Zero?">
             <button id="send-btn">Ask Question</button>
         </div>
@@ -349,11 +289,25 @@
         <h2>System Instructions</h2>
         <div class="card">
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">
-                Customize the AI's behavior for this session. These instructions will be prepended to the default system prompt.
+                Select a system instruction to customize the AI's behavior. The default instruction is always available.
             </p>
-            <textarea id="system-instructions" placeholder="Enter custom system instructions here..."></textarea>
+            <select id="instruction-select" style="width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px;">
+                <option value="">Loading...</option>
+            </select>
+            <textarea id="system-instructions" placeholder="System instruction content will appear here..." style="min-height: 150px;"></textarea>
+            <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="new-instruction-btn" style="background: #27ae60; font-size: 12px; padding: 6px 12px;">New Instruction</button>
+                <button id="save-instruction-btn" style="background: #3498db; font-size: 12px; padding: 6px 12px; display: none;">Save Changes</button>
+                <button id="delete-instruction-btn" style="background: #e74c3c; font-size: 12px; padding: 6px 12px; display: none;">Delete</button>
+            </div>
+        </div>
+        <div id="new-instruction-panel" class="card" style="display: none; margin-top: 20px;">
+            <h3 style="font-size: 16px; margin-bottom: 10px;">Create New System Instruction</h3>
+            <input type="text" id="new-instruction-name" placeholder="Instruction name..." style="width: 100%; padding: 8px; margin-bottom: 10px; font-size: 14px;">
+            <textarea id="new-instruction-content" placeholder="Enter the system instruction content..." style="min-height: 150px; width: 100%;"></textarea>
             <div style="margin-top: 10px; display: flex; gap: 10px;">
-                <button id="reset-instructions-btn" style="background: #7f8c8d; font-size: 12px; padding: 6px 12px;">Reset to Default</button>
+                <button id="create-instruction-btn" style="background: #27ae60; font-size: 12px; padding: 6px 12px;">Create</button>
+                <button id="cancel-new-instruction-btn" style="background: #7f8c8d; font-size: 12px; padding: 6px 12px;">Cancel</button>
             </div>
         </div>
     </div>
@@ -514,7 +468,6 @@
             const input = document.getElementById('chat-input');
             const btn = document.getElementById('send-btn');
             const chatWindow = document.getElementById('chat-window');
-            const bbcodeToggle = document.getElementById('bbcode-mode');
             const systemInstructions = document.getElementById('system-instructions');
             const text = input.value.trim();
 
@@ -534,118 +487,43 @@
             botDiv.innerText = '...thinking...';
             chatWindow.appendChild(botDiv);
             chatWindow.scrollTop = chatWindow.scrollHeight;
-
+            
             btn.disabled = true;
 
             try {
-                const useBbcode = bbcodeToggle ? bbcodeToggle.checked : false;
-                const customInstructions = systemInstructions ? systemInstructions.value.trim() : '';
+                const instructionSelect = document.getElementById('instruction-select');
+                const selectedInstructionId = instructionSelect ? instructionSelect.value : '';
+                
+                // Get the instruction content from the textarea (which is synced with the selected instruction)
+                const instructionContent = systemInstructions ? systemInstructions.value.trim() : '';
+                
                 const res = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         message: text,
-                        bbcode: useBbcode,
-                        system_instruction: customInstructions || undefined
+                        system_instruction: instructionContent || undefined
                     })
                 });
                 const result = await res.json();
                 if (result.error) throw new Error(result.error);
                 
-                let botText = result.answer;
+                const botHtml = result.html;
+                const botText = result.answer;
                 
-                // Check if answer contains HTML (from inline citations)
-                if (botText.includes('<a href') || botText.includes('<span')) {
-                    // We have inline citations, so we need to preserve them
-                    // First, parse Markdown if not in BBCode mode
-                    if (!useBbcode && typeof marked !== 'undefined') {
-                        // Temporarily escape our HTML citations so Markdown parser doesn't break them
-                        const citationPlaceholders = [];
-                        let placeholderIndex = 0;
-                        
-                        // Replace HTML citations with placeholders (use a pattern that won't be interpreted by Markdown)
-                        botText = botText.replace(/<a[^>]*>\[(\d+)\]<\/a>/g, (match, num) => {
-                            const placeholder = `<!--CITATION_${placeholderIndex}-->`;
-                            citationPlaceholders.push({ placeholder, html: match });
-                            placeholderIndex++;
-                            return placeholder;
-                        });
-                        
-                        botText = botText.replace(/<span[^>]*>\[(\d+)\]<\/span>/g, (match, num) => {
-                            const placeholder = `<!--CITATION_${placeholderIndex}-->`;
-                            citationPlaceholders.push({ placeholder, html: match });
-                            placeholderIndex++;
-                            return placeholder;
-                        });
-                        
-                        // Parse Markdown
-                        botText = marked.parse(botText);
-                        
-                        // Restore citations - use a more robust replacement
-                        citationPlaceholders.forEach(item => {
-                            // Escape special regex characters in placeholder
-                            const escapedPlaceholder = item.placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                            const regex = new RegExp(escapedPlaceholder, 'g');
-                            botText = botText.replace(regex, item.html);
-                        });
-                        botDiv.innerHTML = botText;
-                    } else {
-                        // No Markdown parsing, just convert newlines to <br> tags
-                        botText = botText.replace(/\n/g, '<br>');
-                        botDiv.innerHTML = botText;
-                    }
-                } else if (!useBbcode && typeof marked !== 'undefined') {
-                    // No inline citations, just parse Markdown normally
-                    botDiv.innerHTML = marked.parse(botText);
+                // Create content container for the message text
+                const messageContent = document.createElement('div');
+                messageContent.className = 'bot-message-content';
+                if (botHtml) {
+                    messageContent.innerHTML = botHtml;
                 } else {
-                    // BBCode mode or no Markdown parser - display as plain text
-                    botDiv.innerText = botText;
+                    messageContent.innerText = botText;
                 }
-
-                // Add Citations if they exist
-                if (result.citations && result.citations.length > 0) {
-                    const citationContainer = document.createElement('div');
-                    citationContainer.style.marginTop = '10px';
-                    citationContainer.style.fontSize = '12px';
-                    citationContainer.style.color = '#555';
-                    citationContainer.style.borderTop = '1px solid #ddd';
-                    citationContainer.style.paddingTop = '5px';
-                    
-                    const citationTitle = document.createElement('div');
-                    citationTitle.style.fontWeight = 'bold';
-                    citationTitle.innerText = 'Sources:';
-                    citationContainer.appendChild(citationTitle);
-                    
-                    result.citations.forEach(c => {
-                        const link = document.createElement('a');
-                        link.style.display = 'block';
-                        link.style.color = 'var(--primary)';
-                        link.style.textDecoration = 'none';
-                        link.href = c.url || '#';
-                        link.target = '_blank';
-                        // Include citation number if available
-                        const citationNum = c.id ? `[${c.id}] ` : '';
-                        link.innerText = `${citationNum}${c.title}`;
-                        if (!c.url) {
-                            link.style.color = '#888';
-                            link.style.cursor = 'default';
-                        }
-                        citationContainer.appendChild(link);
-                    });
-                    botDiv.appendChild(citationContainer);
-                }
-
-                // Add Copy for phpBB button
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'copy-bbcode-btn';
-                copyBtn.innerText = 'Copy for phpBB';
-                copyBtn.onclick = () => {
-                    navigator.clipboard.writeText(result.answer);
-                    copyBtn.innerText = 'Copied!';
-                    setTimeout(() => copyBtn.innerText = 'Copy for phpBB', 2000);
-                };
-                botDiv.appendChild(copyBtn);
-
+                
+                // Clear botDiv and add content
+                botDiv.innerHTML = '';
+                botDiv.appendChild(messageContent);
+                
             } catch (err) {
                 botDiv.innerText = 'Error: ' + err.message;
                 botDiv.style.color = 'red';
@@ -751,35 +629,220 @@
             document.getElementById('file-editor').style.display = 'none';
         }
 
-        // Initialize system instructions with default
-        async function initializeSystemInstructions() {
-            const systemInstructions = document.getElementById('system-instructions');
-            if (systemInstructions) {
-                try {
-                    const res = await fetch(`${API_URL}/system-instruction`);
-                    const result = await res.json();
-                    if (result.system_instruction) {
-                        systemInstructions.value = result.system_instruction;
-                    }
-                } catch (err) {
-                    console.error('Error loading system instruction:', err);
-                    systemInstructions.placeholder = 'Error loading system instructions';
+
+        // Load all system instructions and populate dropdown
+        async function loadSystemInstructions() {
+            const select = document.getElementById('instruction-select');
+            const textarea = document.getElementById('system-instructions');
+            if (!select || !textarea) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/system-instructions`);
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                const instructions = result.instructions || [];
+                
+                // Clear and populate dropdown
+                select.innerHTML = '';
+                instructions.forEach(inst => {
+                    const option = document.createElement('option');
+                    option.value = inst.id;
+                    option.textContent = inst.name + (inst.is_default ? ' (Default)' : '');
+                    select.appendChild(option);
+                });
+                
+                // Select default if available
+                const defaultOption = select.querySelector('option[value="default"]');
+                if (defaultOption) {
+                    select.value = 'default';
+                    await loadInstructionContent('default');
                 }
+            } catch (err) {
+                console.error('Error loading system instructions:', err);
+                select.innerHTML = '<option value="">Error loading instructions</option>';
             }
         }
-
-        async function resetSystemInstructions() {
-            const systemInstructions = document.getElementById('system-instructions');
-            if (systemInstructions) {
-                try {
-                    const res = await fetch(`${API_URL}/system-instruction`);
-                    const result = await res.json();
-                    if (result.system_instruction) {
-                        systemInstructions.value = result.system_instruction;
-                    }
-                } catch (err) {
-                    console.error('Error loading system instruction:', err);
+        
+        // Load content for a specific instruction
+        async function loadInstructionContent(instructionId) {
+            const textarea = document.getElementById('system-instructions');
+            const saveBtn = document.getElementById('save-instruction-btn');
+            const deleteBtn = document.getElementById('delete-instruction-btn');
+            
+            if (!textarea) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/system-instructions/${instructionId}`);
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                textarea.value = result.instruction || '';
+                textarea.disabled = result.is_default || false;
+                
+                // Show/hide buttons based on whether it's default
+                if (saveBtn) saveBtn.style.display = result.is_default ? 'none' : 'inline-block';
+                if (deleteBtn) deleteBtn.style.display = result.is_default ? 'none' : 'inline-block';
+            } catch (err) {
+                console.error('Error loading instruction content:', err);
+                textarea.value = '';
+                textarea.placeholder = 'Error loading instruction';
+            }
+        }
+        
+        // Handle instruction selection change
+        function handleInstructionSelectChange() {
+            const select = document.getElementById('instruction-select');
+            if (select && select.value) {
+                loadInstructionContent(select.value);
+            }
+        }
+        
+        // Show new instruction panel
+        function showNewInstructionPanel() {
+            const panel = document.getElementById('new-instruction-panel');
+            const nameInput = document.getElementById('new-instruction-name');
+            const contentTextarea = document.getElementById('new-instruction-content');
+            if (panel) panel.style.display = 'block';
+            if (nameInput) nameInput.value = '';
+            if (contentTextarea) contentTextarea.value = '';
+        }
+        
+        // Hide new instruction panel
+        function hideNewInstructionPanel() {
+            const panel = document.getElementById('new-instruction-panel');
+            if (panel) panel.style.display = 'none';
+        }
+        
+        // Create new instruction
+        async function createNewInstruction() {
+            const nameInput = document.getElementById('new-instruction-name');
+            const contentTextarea = document.getElementById('new-instruction-content');
+            
+            if (!nameInput || !contentTextarea) return;
+            
+            const name = nameInput.value.trim();
+            const content = contentTextarea.value.trim();
+            
+            if (!name) {
+                alert('Please enter a name for the instruction');
+                return;
+            }
+            
+            if (!content) {
+                alert('Please enter the instruction content');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_URL}/system-instructions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, instruction: content })
+                });
+                
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                // Reload instructions and select the new one
+                await loadSystemInstructions();
+                const select = document.getElementById('instruction-select');
+                if (select) {
+                    select.value = result.id;
+                    await loadInstructionContent(result.id);
                 }
+                
+                hideNewInstructionPanel();
+            } catch (err) {
+                alert('Error creating instruction: ' + err.message);
+            }
+        }
+        
+        // Save changes to current instruction
+        async function saveCurrentInstruction() {
+            const select = document.getElementById('instruction-select');
+            const textarea = document.getElementById('system-instructions');
+            
+            if (!select || !textarea) return;
+            
+            const instructionId = select.value;
+            if (!instructionId || instructionId === 'default') {
+                alert('Cannot save the default instruction. Create a new one to customize.');
+                return;
+            }
+            
+            const content = textarea.value.trim();
+            if (!content) {
+                alert('Instruction content cannot be empty');
+                return;
+            }
+            
+            // Get the current instruction to preserve the name
+            try {
+                const getRes = await fetch(`${API_URL}/system-instructions/${instructionId}`);
+                const getResult = await getRes.json();
+                if (getResult.error) throw new Error(getResult.error);
+                
+                // Delete old and create new (since we don't have an update endpoint)
+                const deleteRes = await fetch(`${API_URL}/system-instructions/${instructionId}`, {
+                    method: 'DELETE'
+                });
+                const deleteResult = await deleteRes.json();
+                if (deleteResult.error) throw new Error(deleteResult.error);
+                
+                // Create new with same name
+                const createRes = await fetch(`${API_URL}/system-instructions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: getResult.name, instruction: content })
+                });
+                
+                const createResult = await createRes.json();
+                if (createResult.error) throw new Error(createResult.error);
+                
+                // Reload and select the updated instruction
+                await loadSystemInstructions();
+                if (select) {
+                    select.value = createResult.id;
+                    await loadInstructionContent(createResult.id);
+                }
+            } catch (err) {
+                alert('Error saving instruction: ' + err.message);
+            }
+        }
+        
+        // Delete current instruction
+        async function deleteCurrentInstruction() {
+            const select = document.getElementById('instruction-select');
+            if (!select) return;
+            
+            const instructionId = select.value;
+            if (!instructionId || instructionId === 'default') {
+                alert('Cannot delete the default instruction');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to delete this instruction?')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_URL}/system-instructions/${instructionId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                // Reload instructions and select default
+                await loadSystemInstructions();
+                const selectAfter = document.getElementById('instruction-select');
+                if (selectAfter) {
+                    selectAfter.value = 'default';
+                    await loadInstructionContent('default');
+                }
+            } catch (err) {
+                alert('Error deleting instruction: ' + err.message);
             }
         }
 
@@ -792,11 +855,16 @@
             document.getElementById('cancel-edit-btn').onclick = hideFileDetails;
             document.getElementById('clear-store-btn').onclick = handleClearStore;
             document.getElementById('send-btn').onclick = sendMessage;
-            document.getElementById('reset-instructions-btn').onclick = resetSystemInstructions;
+            document.getElementById('instruction-select').onchange = handleInstructionSelectChange;
+            document.getElementById('new-instruction-btn').onclick = showNewInstructionPanel;
+            document.getElementById('create-instruction-btn').onclick = createNewInstruction;
+            document.getElementById('cancel-new-instruction-btn').onclick = hideNewInstructionPanel;
+            document.getElementById('save-instruction-btn').onclick = saveCurrentInstruction;
+            document.getElementById('delete-instruction-btn').onclick = deleteCurrentInstruction;
             document.getElementById('chat-input').onkeypress = (e) => {
                 if (e.key === 'Enter') sendMessage();
             };
-            initializeSystemInstructions();
+            loadSystemInstructions();
             loadFiles();
         });
     </script>

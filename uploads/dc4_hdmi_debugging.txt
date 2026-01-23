@@ -1,9 +1,14 @@
-On a the Pi4 or Pi5 family, to debug issues with no display, you should:
+To debug the HDMI on Raspberry Pi devices you should follow these steps:
 
-Remove sdcard/SSD/USB and any other connected hardware.
-Connect HDMI to primary display port (the one closest to USB power port), and apply power.
+Connect HDMI to the primary display port (the one closest to the USB power port)
 
-Do you see the diagnostic screen? If so, check the "DISPLAY:" line.
+For Pi 4, Pi 5 or Pi 400 devices, remove sdcard/SSD/USB and any other connected hardware and apply power.
+
+For Pi 500 devices which are booting from NVMe storage, you will need to reboot the device into the bootloader holding the spacebar  down to choose the boot mode.  If you make sure there is no SD card in the device and press 1 to boot from SD card you will see it just looping looking for SD card.  Now press the 'Esc' key to go to the diagnostics screen.
+
+The diagnostics screen is a black and white screen which gives some details of the board including the HDMI status.
+
+Check the "DISPLAY:" line.
 
 It should show:
 display: DISP0: HDMI HPD=1 EDID=ok #2 DISP: HDP=0 EDID=none #0
