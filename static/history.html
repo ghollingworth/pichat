@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat History - PiChat</title>
+    <style>
+        :root {
+            --primary: #c51a4a; /* Raspberry Pi redish color */
+            --secondary: #2f3542;
+            --bg: #f1f2f6;
+            --white: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg);
+            color: var(--secondary);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--white);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-size: 14px;
+        }
+        button:hover { opacity: 0.9; }
+        button.secondary {
+            background: #2f3542;
+        }
+        button.danger {
+            background: #e74c3c;
+        }
+        #conversations-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        .conversation-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .conversation-item:hover {
+            background-color: #f8f9fa;
+        }
+        .conversation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .conversation-preview {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .conversation-date {
+            color: #999;
+            font-size: 12px;
+        }
+        #conversation-view {
+            display: none;
+            margin-top: 20px;
+        }
+        #chat-window {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.4;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: var(--primary);
+            color: white;
+        }
+        .bot-message {
+            align-self: flex-start;
+            background-color: #e4e6eb;
+            color: black;
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            gap: 15px;
+            max-width: 100%;
+        }
+        .bot-message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .bot-message-format-selector {
+            font-size: 11px;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background: white;
+            color: #666;
+            cursor: pointer;
+        }
+        .bot-message-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .citation-range {
+            background-color: #e8f4f8;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .citation-range:hover {
+            background-color: #d4e8f0;
+        }
+        .citation-range.active {
+            background-color: #c0d8e8;
+        }
+        #citations-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .citation-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-left: 3px solid var(--primary);
+            border-radius: 4px;
+        }
+        .citation-item-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: var(--secondary);
+        }
+        .citation-item-url {
+            font-size: 11px;
+            color: #666;
+            word-break: break-all;
+        }
+        .citation-item-url a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .citation-item-url a:hover {
+            text-decoration: underline;
+        }
+        .citation-badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span>Chat History</span>
+            <div>
+                <button class="secondary" onclick="window.location.href='/'">Back to Chat</button>
+                <button onclick="loadConversations()" style="margin-left: 10px;">Refresh</button>
+            </div>
+        </h1>
+        
+        <div id="conversations-list-container">
+            <ul id="conversations-list">
+                <li class="loading">Loading conversations...</li>
+            </ul>
+        </div>
+        
+        <div id="conversation-view">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 id="conversation-title">Conversation</h2>
+                <div>
+                    <button class="danger" id="delete-conversation-btn">Delete</button>
+                    <button class="secondary" onclick="showConversationsList()" style="margin-left: 10px;">Back to List</button>
+                </div>
+            </div>
+            <div id="chat-window"></div>
+            <div id="citations-panel" style="display: none;">
+                <h3 style="font-size: 16px; margin-bottom: 10px;">Citations</h3>
+                <button onclick="showAllCitations()" style="background: #2f3542; font-size: 12px; padding: 6px 12px; margin-bottom: 10px; width: 100%;">Show All Citations</button>
+                <div id="citations-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        let currentConversation = null;
+        let currentChunks = {};
+        
+        async function loadConversations() {
+            const list = document.getElementById('conversations-list');
+            list.innerHTML = '<li class="loading">Loading conversations...</li>';
+            
+            try {
+                const res = await fetch(`${API_URL}/chat/history`);
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                const conversations = result.conversations || [];
+                
+                if (conversations.length === 0) {
+                    list.innerHTML = '<li class="empty-state">No conversations yet. Start chatting to see history here!</li>';
+                    return;
+                }
+                
+                list.innerHTML = '';
+                conversations.forEach(conv => {
+                    const li = document.createElement('li');
+                    li.className = 'conversation-item';
+                    const date = new Date(conv.created_at);
+                    li.innerHTML = `
+                        <div class="conversation-header">
+                            <div>
+                                <strong>Conversation ${conv.id.substring(0, 20)}...</strong>
+                                <div class="conversation-date">${date.toLocaleString()}</div>
+                            </div>
+                            <div style="color: #666; font-size: 14px;">${conv.message_count} messages</div>
+                        </div>
+                        <div class="conversation-preview">${conv.preview || 'No preview'}</div>
+                    `;
+                    li.onclick = () => loadConversation(conv.id);
+                    list.appendChild(li);
+                });
+            } catch (err) {
+                list.innerHTML = `<li style="color:red">Error: ${err.message}</li>`;
+            }
+        }
+        
+        async function loadConversation(conversationId) {
+            const listContainer = document.getElementById('conversations-list-container');
+            const viewContainer = document.getElementById('conversation-view');
+            
+            listContainer.style.display = 'none';
+            viewContainer.style.display = 'block';
+            
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.innerHTML = '<div class="loading">Loading conversation...</div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/chat/history/${conversationId}`);
+                const conversation = await res.json();
+                if (conversation.error) throw new Error(conversation.error);
+                
+                currentConversation = conversation;
+                document.getElementById('conversation-title').textContent = `Conversation from ${new Date(conversation.created_at).toLocaleString()}`;
+                
+                // Render messages
+                chatWindow.innerHTML = '';
+                let hasAnyCitations = false;
+                conversation.messages.forEach((msg, index) => {
+                    if (msg.role === 'user') {
+                        const userDiv = document.createElement('div');
+                        userDiv.className = 'message user-message';
+                        userDiv.innerText = msg.message;
+                        chatWindow.appendChild(userDiv);
+                    } else if (msg.role === 'bot') {
+                        const botDiv = document.createElement('div');
+                        botDiv.className = 'message bot-message';
+                        
+                        // Store all format data in dataset for dynamic switching
+                        // For old conversations, fall back to available formats
+                        const chunks = msg.chunks || {};
+                        botDiv.dataset.chunks = JSON.stringify(chunks);
+                        const baseAnswer = msg.answer || '';
+                        botDiv.dataset.html = msg.html || '';
+                        botDiv.dataset.markdown = msg.markdown_formatted || baseAnswer;
+                        botDiv.dataset.raw = msg.raw || baseAnswer;
+                        botDiv.dataset.rawCitations = msg.raw_citations || '';
+                        botDiv.dataset.phpbb = msg.phpbb || baseAnswer;
+                        botDiv.dataset.currentMode = msg.output_mode || 'html';
+                        botDiv.dataset.messageIndex = index;
+                        
+                        // Create message wrapper
+                        const messageWrapper = document.createElement('div');
+                        messageWrapper.style.display = 'flex';
+                        messageWrapper.style.flexDirection = 'column';
+                        messageWrapper.style.width = '100%';
+                        
+                        // Create header with format selector
+                        const messageHeader = document.createElement('div');
+                        messageHeader.className = 'bot-message-header';
+                        const formatSelector = document.createElement('select');
+                        formatSelector.className = 'bot-message-format-selector';
+                        formatSelector.innerHTML = `
+                            <option value="html">HTML</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="raw">Raw</option>
+                            <option value="phpbb">PHPBB</option>
+                        `;
+                        formatSelector.value = msg.output_mode || 'html';
+                        formatSelector.onchange = () => switchMessageFormat(botDiv, formatSelector.value);
+                        messageHeader.appendChild(formatSelector);
+                        messageWrapper.appendChild(messageHeader);
+                        
+                        // Create content container
+                        const messageContent = document.createElement('div');
+                        messageContent.className = 'bot-message-content';
+                        messageWrapper.appendChild(messageContent);
+                        
+                        // Display initial format
+                        displayMessageFormat(botDiv, messageContent, msg.output_mode || 'html', chunks, index);
+                        
+                        botDiv.appendChild(messageWrapper);
+                        chatWindow.appendChild(botDiv);
+                        
+                        // Track if any message has citations
+                        if (chunks && Object.keys(chunks).length > 0) {
+                            hasAnyCitations = true;
+                        }
+                    }
+                });
+                
+                // Show citations panel if any message has citations
+                if (hasAnyCitations) {
+                    document.getElementById('citations-panel').style.display = 'block';
+                    // Show citations from the last message with citations
+                    const lastBotMessage = Array.from(chatWindow.querySelectorAll('.bot-message')).reverse().find(div => div.dataset.chunks);
+                    if (lastBotMessage) {
+                        const chunks = JSON.parse(lastBotMessage.dataset.chunks);
+                        currentChunks = chunks;
+                        displayAllCitations(chunks);
+                    }
+                } else {
+                    document.getElementById('citations-panel').style.display = 'none';
+                }
+                
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            } catch (err) {
+                chatWindow.innerHTML = `<div style="color:red">Error loading conversation: ${err.message}</div>`;
+            }
+        }
+        
+        function showConversationsList() {
+            document.getElementById('conversations-list-container').style.display = 'block';
+            document.getElementById('conversation-view').style.display = 'none';
+            currentConversation = null;
+            currentChunks = {};
+            document.getElementById('citations-panel').style.display = 'none';
+        }
+        
+        async function deleteConversation() {
+            if (!currentConversation) return;
+            
+            if (!confirm('Are you sure you want to delete this conversation?')) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/chat/history/${currentConversation.id}`, {
+                    method: 'DELETE'
+                });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                showConversationsList();
+                loadConversations();
+            } catch (err) {
+                alert('Error deleting conversation: ' + err.message);
+            }
+        }
+        
+        function displayMessageFormat(botDiv, messageContent, format, chunks, messageIndex) {
+            messageContent.innerHTML = '';
+            
+            if (format === 'html') {
+                const html = botDiv.dataset.html || '';
+                if (html) {
+                    messageContent.innerHTML = html;
+                } else {
+                    messageContent.innerText = botDiv.dataset.markdown || '';
+                }
+                
+                // Set up citation-range click handlers
+                if (chunks && Object.keys(chunks).length > 0) {
+                    setupCitationHandlers(messageContent, chunks, messageIndex);
+                }
+            } else {
+                // Other modes: display formatted text with inline citations
+                let formattedText = '';
+                if (format === 'markdown') {
+                    formattedText = botDiv.dataset.markdown || '';
+                } else if (format === 'raw') {
+                    // For raw mode, display original text and append citations at the end
+                    const rawText = botDiv.dataset.raw || '';
+                    const rawCitations = botDiv.dataset.rawCitations || '';
+                    formattedText = rawText;
+                    if (rawCitations) {
+                        formattedText += '\n\nCitations:\n' + rawCitations;
+                    }
+                } else if (format === 'phpbb') {
+                    formattedText = botDiv.dataset.phpbb || '';
+                } else {
+                    formattedText = botDiv.dataset.markdown || '';
+                }
+                
+                // For non-HTML modes, display as preformatted text
+                const pre = document.createElement('pre');
+                pre.style.whiteSpace = 'pre-wrap';
+                pre.style.wordWrap = 'break-word';
+                pre.style.fontFamily = 'inherit';
+                pre.style.margin = '0';
+                pre.style.padding = '0';
+                pre.textContent = formattedText;
+                messageContent.appendChild(pre);
+            }
+        }
+        
+        function switchMessageFormat(botDiv, newFormat) {
+            const messageContent = botDiv.querySelector('.bot-message-content');
+            if (!messageContent) return;
+            
+            const chunksStr = botDiv.dataset.chunks;
+            const chunks = chunksStr ? JSON.parse(chunksStr) : {};
+            const messageIndex = botDiv.dataset.messageIndex;
+            
+            botDiv.dataset.currentMode = newFormat;
+            displayMessageFormat(botDiv, messageContent, newFormat, chunks, messageIndex);
+            
+            // Update citations panel if switching to HTML mode
+            if (newFormat === 'html' && chunks && Object.keys(chunks).length > 0) {
+                currentChunks = chunks;
+                displayAllCitations(chunks);
+            }
+        }
+        
+        function setupCitationHandlers(messageContent, chunks, messageIndex) {
+            const citationRanges = messageContent.querySelectorAll('.citation-range');
+            citationRanges.forEach(range => {
+                range.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // Remove active class from all ranges
+                    document.querySelectorAll('.citation-range').forEach(r => r.classList.remove('active'));
+                    // Add active class to clicked range
+                    this.classList.add('active');
+                    
+                    // Update current chunks to this message's chunks
+                    currentChunks = chunks;
+                    
+                    // Get chunk indices from data attribute
+                    const chunkIndicesStr = this.getAttribute('data-chunk-indices');
+                    if (chunkIndicesStr) {
+                        const chunkIndices = chunkIndicesStr.split(',').map(idx => parseInt(idx.trim()));
+                        displayCitationsForChunks(chunkIndices, chunks);
+                    }
+                });
+            });
+            
+            // Click outside citation ranges to show all citations for this message
+            messageContent.addEventListener('click', function(e) {
+                if (!e.target.closest('.citation-range')) {
+                    document.querySelectorAll('.citation-range').forEach(r => r.classList.remove('active'));
+                    currentChunks = chunks;
+                    displayAllCitations(chunks);
+                }
+            });
+        }
+        
+        function displayCitationsForChunks(chunkIndices, chunks) {
+            const citationsList = document.getElementById('citations-list');
+            if (!citationsList) return;
+            
+            citationsList.innerHTML = '';
+            
+            if (chunkIndices.length === 0) {
+                citationsList.innerHTML = '<p style="color: #666; font-size: 12px;">No citations for this range.</p>';
+                return;
+            }
+            
+            // Sort by citation number
+            const citations = chunkIndices
+                .map(idx => {
+                    const chunk = chunks[idx];
+                    if (!chunk) return null;
+                    return { ...chunk, chunk_idx: idx };
+                })
+                .filter(c => c !== null)
+                .sort((a, b) => (a.citation_num || 0) - (b.citation_num || 0));
+            
+            citations.forEach(citation => {
+                const item = document.createElement('div');
+                item.className = 'citation-item';
+                const badge = citation.citation_num ? `<span class="citation-badge">${citation.citation_num}</span>` : '';
+                const title = citation.title || 'Untitled';
+                const url = citation.url || '';
+                
+                item.innerHTML = `
+                    <div class="citation-item-title">${badge}${title}</div>
+                    <div class="citation-item-url">
+                        ${url ? `<a href="${url}" target="_blank">${url}</a>` : '<span style="color: #999;">No URL available</span>'}
+                    </div>
+                `;
+                citationsList.appendChild(item);
+            });
+        }
+        
+        function displayAllCitations(chunks) {
+            const citationsList = document.getElementById('citations-list');
+            if (!citationsList) return;
+            
+            citationsList.innerHTML = '';
+            
+            if (Object.keys(chunks).length === 0) {
+                citationsList.innerHTML = '<p style="color: #666; font-size: 12px;">No citations available.</p>';
+                return;
+            }
+            
+            // Convert chunks object to array and sort by citation number
+            const citations = Object.entries(chunks)
+                .map(([idx, chunk]) => ({ ...chunk, chunk_idx: parseInt(idx) }))
+                .sort((a, b) => (a.citation_num || 0) - (b.citation_num || 0));
+            
+            citations.forEach(citation => {
+                const item = document.createElement('div');
+                item.className = 'citation-item';
+                const badge = citation.citation_num ? `<span class="citation-badge">${citation.citation_num}</span>` : '';
+                const title = citation.title || 'Untitled';
+                const url = citation.url || '';
+                
+                item.innerHTML = `
+                    <div class="citation-item-title">${badge}${title}</div>
+                    <div class="citation-item-url">
+                        ${url ? `<a href="${url}" target="_blank">${url}</a>` : '<span style="color: #999;">No URL available</span>'}
+                    </div>
+                `;
+                citationsList.appendChild(item);
+            });
+        }
+        
+        function showAllCitations() {
+            // Remove active class from all citation ranges
+            document.querySelectorAll('.citation-range').forEach(r => r.classList.remove('active'));
+            // Display all citations
+            displayAllCitations(currentChunks);
+        }
+        
+        // Event listeners
+        document.getElementById('delete-conversation-btn').onclick = deleteConversation;
+        
+        // Load conversations on page load
+        loadConversations();
+    </script>
+</body>
+</html>

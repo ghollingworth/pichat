@@ -3,4 +3,6 @@ flask
 flask-cors
 python-dotenv
 markdown-it-py
+beautifulsoup4
+requests
 
