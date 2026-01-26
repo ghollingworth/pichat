@@ -302,6 +302,10 @@ print(current_store)
 
 @app.route('/')
 def index():
+    return send_from_directory(app.static_folder, 'chat.html')
+
+@app.route('/admin')
+def admin():
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/files', methods=['GET'])
@@ -878,6 +882,8 @@ def chat():
                 )
             )
         
+        print("RESPONSE", response.text)
+
         # Save fixture if requested (only in normal mode)
         if save_fixture_name and not test_mode:
             gm = None
@@ -961,9 +967,6 @@ def chat():
             )
         )
         
-        print("GROUNDING_SUPPORTS", json.dumps(rendered["supports"], indent=2, ensure_ascii=False))
-        if output_mode == 'html':
-            print("GROUNDING_HTML", rendered_html.get("html", ""))
         
         # Save to chat history if conversation_id is provided
         conversation_id = data.get('conversation_id')

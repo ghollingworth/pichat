@@ -438,8 +438,41 @@ class CitationRenderer:
                         return result
                 
                 md = markdown_it_class("commonmark", {"sourcepos": True}, renderer_cls=SourcePosRenderer)
-                html = md.render(annotated_markdown)
-                html = self._wrap_html_with_supports(html, supports_with_lines)
+                html_before_wrap = md.render(annotated_markdown)
+                
+                # DIAGNOSTIC: Log markdown and HTML before wrapping
+                import os
+                if os.getenv('DEBUG_CITATIONS'):
+                    print("=" * 80)
+                    print("DIAGNOSTIC: Original Markdown (first 500 chars):")
+                    print(markdown_text[:500])
+                    print("\nDIAGNOSTIC: HTML before citation wrapping (first 1000 chars):")
+                    print(html_before_wrap[:1000])
+                    # Check for list structures
+                    if '<ul>' in html_before_wrap or '<ol>' in html_before_wrap:
+                        print("\nDIAGNOSTIC: Found list structures in HTML before wrapping")
+                        # Extract list sections
+                        import re
+                        list_sections = re.findall(r'<(ul|ol)[^>]*>.*?</\1>', html_before_wrap, re.DOTALL)
+                        for i, section in enumerate(list_sections[:3]):  # Show first 3 lists
+                            print(f"\nList section {i+1} (first 200 chars):")
+                            print(section[:200])
+                
+                html = self._wrap_html_with_supports(html_before_wrap, supports_with_lines)
+                
+                # DIAGNOSTIC: Log HTML after wrapping
+                if os.getenv('DEBUG_CITATIONS'):
+                    print("\nDIAGNOSTIC: HTML after citation wrapping (first 1000 chars):")
+                    print(html[:1000])
+                    # Check if list structure changed
+                    if '<ul>' in html or '<ol>' in html:
+                        list_sections_after = re.findall(r'<(ul|ol)[^>]*>.*?</\1>', html, re.DOTALL)
+                        print(f"\nDIAGNOSTIC: Found {len(list_sections_after)} list sections after wrapping")
+                        for i, section in enumerate(list_sections_after[:3]):
+                            print(f"\nList section {i+1} after wrapping (first 200 chars):")
+                            print(section[:200])
+                    print("=" * 80)
+                    
             except Exception as exc:
                 raise ImportError("markdown-it-py is required to render markdown to HTML") from exc
 
@@ -533,6 +566,16 @@ class CitationRenderer:
             raise ImportError("beautifulsoup4 is required for HTML post-processing") from exc
 
         soup = bs4.BeautifulSoup(html, "html.parser")
+        
+        # DIAGNOSTIC: Check for list items before wrapping
+        import os
+        if os.getenv('DEBUG_CITATIONS'):
+            list_items_before = soup.find_all('li')
+            print(f"\nDIAGNOSTIC: Found {len(list_items_before)} <li> elements before wrapping")
+            if list_items_before:
+                print("Sample <li> elements (first 3):")
+                for li in list_items_before[:3]:
+                    print(f"  - Parent: {li.parent.name if li.parent else 'None'}, Content: {str(li)[:100]}")
 
         def parse_sourcepos(value):
             match = re.match(r"^(\d+):\d+-(\d+):\d+$", value or "")
@@ -600,16 +643,66 @@ class CitationRenderer:
                     if chunk_idx is not None and chunk_idx not in chunk_indices:
                         chunk_indices.append(chunk_idx)
             
-            # Create wrapper and insert before first element
-            wrapper = soup.new_tag("div")
-            wrapper["class"] = f"citation-range citation-range-{idx}"
-            wrapper["data-cite-id"] = str(idx)
-            if chunk_indices:
-                wrapper["data-chunk-indices"] = ",".join(str(ci) for ci in sorted(chunk_indices))
-            wrapper["style"] = "cursor: pointer;"
-            to_wrap[0].insert_before(wrapper)
-            # Move all elements to wrap into the wrapper
-            for el in to_wrap:
-                wrapper.append(el.extract())
+            # Check if we're wrapping list items - this breaks HTML structure!
+            # List items (<li>) must be direct children of <ul> or <ol>
+            import os
+            debug_mode = os.getenv('DEBUG_CITATIONS')
+            list_items_in_wrap = [el for el in to_wrap if el.name == 'li']
+            non_list_items = [el for el in to_wrap if el.name != 'li']
+            
+            if list_items_in_wrap:
+                # DIAGNOSTIC: Log the fix
+                if debug_mode:
+                    print(f"\nDIAGNOSTIC: FIXING - Adding citation-range class directly to {len(list_items_in_wrap)} <li> elements (citation-range-{idx})")
+                    print(f"  Support range: lines {start_line}-{end_line}")
+                    print("  This preserves list structure instead of wrapping in <div>")
+                
+                # Fix: Add citation-range class and attributes directly to <li> elements
+                # This preserves HTML structure (li must be direct child of ul/ol)
+                for li in list_items_in_wrap:
+                    # Add or append to existing class
+                    existing_class = li.get('class', [])
+                    if isinstance(existing_class, str):
+                        existing_class = [existing_class]
+                    if f'citation-range-{idx}' not in existing_class:
+                        existing_class.append('citation-range')
+                        existing_class.append(f'citation-range-{idx}')
+                        li['class'] = existing_class
+                    
+                    # Set data attributes
+                    li['data-cite-id'] = str(idx)
+                    if chunk_indices:
+                        li['data-chunk-indices'] = ",".join(str(ci) for ci in sorted(chunk_indices))
+                    li['style'] = "cursor: pointer;"
+                
+                # Remove list items from to_wrap since we've handled them
+                to_wrap = non_list_items
+            
+            # For non-list items, wrap them normally
+            if to_wrap:
+                # Create wrapper and insert before first element
+                wrapper = soup.new_tag("div")
+                wrapper["class"] = f"citation-range citation-range-{idx}"
+                wrapper["data-cite-id"] = str(idx)
+                if chunk_indices:
+                    wrapper["data-chunk-indices"] = ",".join(str(ci) for ci in sorted(chunk_indices))
+                wrapper["style"] = "cursor: pointer;"
+                to_wrap[0].insert_before(wrapper)
+                # Move all elements to wrap into the wrapper
+                for el in to_wrap:
+                    wrapper.append(el.extract())
+            
+            # DIAGNOSTIC: Verify list structure is preserved after fix
+            if debug_mode:
+                list_items_after = soup.find_all('li')
+                orphaned_lis = [li for li in list_items_after if li.parent.name not in ['ul', 'ol']]
+                if orphaned_lis:
+                    print(f"\nDIAGNOSTIC: WARNING - Still found {len(orphaned_lis)} orphaned <li> elements after fix")
+                    print("  This should not happen - list structure should be preserved")
+                    for li in orphaned_lis[:2]:
+                        parent_name = li.parent.name if li.parent else 'None'
+                        print(f"  - Orphaned <li> parent: {parent_name}, content: {str(li)[:80]}")
+                else:
+                    print(f"\nDIAGNOSTIC: SUCCESS - All {len(list_items_after)} <li> elements are properly nested in <ul>/<ol>")
 
         return str(soup)

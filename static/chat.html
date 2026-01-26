@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiChat - Raspberry Pi Assistant</title>
+    <style>
+        :root {
+            --primary: #c51a4a; /* Raspberry Pi redish color */
+            --secondary: #2f3542;
+            --bg: #f1f2f6;
+            --white: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--secondary);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #chat-window {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+        .user-message {
+            background: #e3f2fd;
+            margin-left: 20%;
+            text-align: right;
+        }
+        .bot-message {
+            background: #f5f5f5;
+            margin-right: 20%;
+        }
+        .bot-message-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+        .bot-message-format-selector {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+        .bot-message-content {
+            width: 100%;
+        }
+        .citation-range {
+            background-color: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .citation-range:hover {
+            background-color: #ffe69c;
+        }
+        .citation-range.active {
+            background-color: #c0d8e8;
+        }
+        #citations-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .citation-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-left: 3px solid var(--primary);
+            border-radius: 4px;
+        }
+        .citation-item-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: var(--secondary);
+        }
+        .citation-item-url {
+            font-size: 11px;
+            color: #666;
+            word-break: break-all;
+        }
+        .citation-item-url a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .citation-item-url a:hover {
+            text-decoration: underline;
+        }
+        .citation-badge {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+        #chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            outline: none;
+        }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #a0153a;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #view-history-btn {
+            background: #3498db;
+        }
+        #view-history-btn:hover {
+            background: #2980b9;
+        }
+        #show-all-citations-btn {
+            background: #2f3542;
+            width: 100%;
+        }
+        #show-all-citations-btn:hover {
+            background: #1a1d24;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: inherit;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <div id="chat-window">
+            <div class="message bot-message">Hello! I'm your Raspberry Pi assistant. Ask me anything about hardware or software, and I'll use our curated knowledge base to answer.</div>
+        </div>
+        
+        <div id="citations-panel">
+            <h3 style="font-size: 16px; margin-bottom: 10px;">Citations</h3>
+            <button id="show-all-citations-btn">Show All Citations</button>
+            <div id="citations-list">
+                <!-- Citations will be loaded here -->
+            </div>
+        </div>
+        
+        <div id="chat-input-area">
+            <div style="display: flex; gap: 10px; width: 100%;">
+                <input type="text" id="chat-input" placeholder="e.g. How do I enable I2C on a Pi Zero?" style="flex: 1;">
+                <button id="send-btn">Ask Question</button>
+                <button id="view-history-btn">View History</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+
+        // --- Citations ---
+        let currentChunks = {};
+        
+        function setupCitationHandlers(messageContent, chunks) {
+            currentChunks = chunks;
+            const citationRanges = messageContent.querySelectorAll('.citation-range');
+            citationRanges.forEach(range => {
+                range.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // Remove active class from all ranges
+                    citationRanges.forEach(r => r.classList.remove('active'));
+                    // Add active class to clicked range
+                    this.classList.add('active');
+                    
+                    // Get chunk indices from data attribute
+                    const chunkIndicesStr = this.getAttribute('data-chunk-indices');
+                    if (chunkIndicesStr) {
+                        const chunkIndices = chunkIndicesStr.split(',').map(idx => parseInt(idx.trim()));
+                        displayCitationsForChunks(chunkIndices, chunks);
+                    }
+                });
+            });
+            
+            // Click outside citation ranges to show all citations
+            messageContent.addEventListener('click', function(e) {
+                if (!e.target.closest('.citation-range')) {
+                    citationRanges.forEach(r => r.classList.remove('active'));
+                    displayAllCitations(chunks);
+                }
+            });
+        }
+        
+        function displayCitationsForChunks(chunkIndices, chunks) {
+            const citationsList = document.getElementById('citations-list');
+            if (!citationsList) return;
+            
+            citationsList.innerHTML = '';
+            
+            if (chunkIndices.length === 0) {
+                citationsList.innerHTML = '<p style="color: #666; font-size: 12px;">No citations for this range.</p>';
+                return;
+            }
+            
+            // Sort by citation number
+            const citations = chunkIndices
+                .map(idx => {
+                    const chunk = chunks[idx];
+                    if (!chunk) return null;
+                    return { ...chunk, chunk_idx: idx };
+                })
+                .filter(c => c !== null)
+                .sort((a, b) => (a.citation_num || 0) - (b.citation_num || 0));
+            
+            citations.forEach(citation => {
+                const item = document.createElement('div');
+                item.className = 'citation-item';
+                item.innerHTML = `
+                    <div class="citation-item-title">
+                        <span class="citation-badge">${citation.citation_num || ''}</span>
+                        ${citation.title || 'Untitled'}
+                    </div>
+                    <div class="citation-item-url">
+                        <a href="${citation.url || '#'}" target="_blank">${citation.url || 'No URL'}</a>
+                    </div>
+                `;
+                citationsList.appendChild(item);
+            });
+        }
+        
+        function displayAllCitations(chunks) {
+            const citationsList = document.getElementById('citations-list');
+            if (!citationsList) return;
+            
+            citationsList.innerHTML = '';
+            
+            if (!chunks || Object.keys(chunks).length === 0) {
+                citationsList.innerHTML = '<p style="color: #666; font-size: 12px;">No citations available.</p>';
+                return;
+            }
+            
+            // Sort by citation number
+            const citations = Object.entries(chunks)
+                .map(([idx, chunk]) => ({ ...chunk, chunk_idx: parseInt(idx) }))
+                .sort((a, b) => (a.citation_num || 0) - (b.citation_num || 0));
+            
+            citations.forEach(citation => {
+                const item = document.createElement('div');
+                item.className = 'citation-item';
+                item.innerHTML = `
+                    <div class="citation-item-title">
+                        <span class="citation-badge">${citation.citation_num || ''}</span>
+                        ${citation.title || 'Untitled'}
+                    </div>
+                    <div class="citation-item-url">
+                        <a href="${citation.url || '#'}" target="_blank">${citation.url || 'No URL'}</a>
+                    </div>
+                `;
+                citationsList.appendChild(item);
+            });
+        }
+        
+        function showCitationsPanel() {
+            const panel = document.getElementById('citations-panel');
+            if (panel) {
+                panel.style.display = 'block';
+            }
+        }
+        
+        function hideCitationsPanel() {
+            const panel = document.getElementById('citations-panel');
+            if (panel) {
+                panel.style.display = 'none';
+            }
+        }
+
+        function displayMessageFormat(botDiv, messageContent, format, chunks) {
+            messageContent.innerHTML = '';
+            
+            if (format === 'html') {
+                // HTML mode: render HTML and set up citation handlers
+                const html = botDiv.dataset.html || '';
+                messageContent.innerHTML = html;
+                
+                if (chunks && Object.keys(chunks).length > 0) {
+                    setupCitationHandlers(messageContent, chunks);
+                    showCitationsPanel();
+                    displayAllCitations(chunks);
+                } else {
+                    hideCitationsPanel();
+                }
+            } else {
+                // Other modes: display formatted text with inline citations
+                let formattedText = '';
+                if (format === 'markdown') {
+                    formattedText = botDiv.dataset.markdown || '';
+                } else if (format === 'raw') {
+                    // For raw mode, display original text and append citations at the end
+                    const rawText = botDiv.dataset.raw || '';
+                    const rawCitations = botDiv.dataset.rawCitations || '';
+                    formattedText = rawText;
+                    if (rawCitations) {
+                        formattedText += '\n\nCitations:\n' + rawCitations;
+                    }
+                } else if (format === 'phpbb') {
+                    formattedText = botDiv.dataset.phpbb || '';
+                } else {
+                    formattedText = botDiv.dataset.markdown || '';
+                }
+                
+                // For non-HTML modes, display as preformatted text
+                const pre = document.createElement('pre');
+                pre.style.whiteSpace = 'pre-wrap';
+                pre.style.wordWrap = 'break-word';
+                pre.style.fontFamily = 'inherit';
+                pre.style.margin = '0';
+                pre.style.padding = '0';
+                pre.textContent = formattedText;
+                messageContent.appendChild(pre);
+                
+                // Hide citations panel for non-HTML modes (citations are inline)
+                hideCitationsPanel();
+            }
+        }
+        
+        function switchMessageFormat(botDiv, newFormat) {
+            const messageContent = botDiv.querySelector('.bot-message-content');
+            if (!messageContent) return;
+            
+            const chunksStr = botDiv.dataset.chunks;
+            const chunks = chunksStr ? JSON.parse(chunksStr) : {};
+            
+            botDiv.dataset.currentMode = newFormat;
+            displayMessageFormat(botDiv, messageContent, newFormat, chunks);
+        }
+        
+        // --- Chat ---
+        // Each question gets its own conversation ID (no persistent conversation)
+        
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const btn = document.getElementById('send-btn');
+            const chatWindow = document.getElementById('chat-window');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            // Add user message
+            const userDiv = document.createElement('div');
+            userDiv.className = 'message user-message';
+            userDiv.innerText = text;
+            chatWindow.appendChild(userDiv);
+            input.value = '';
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            // Add loading placeholder
+            const botDiv = document.createElement('div');
+            botDiv.className = 'message bot-message';
+            botDiv.innerText = '...thinking...';
+            chatWindow.appendChild(botDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            
+            btn.disabled = true;
+
+            try {
+                // Generate a new conversation ID for each question
+                const conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: text,
+                        conversation_id: conversationId  // Each question gets its own conversation
+                    })
+                });
+                const result = await res.json();
+                if (result.error) throw new Error(result.error);
+                
+                // Store all format data in dataset for dynamic switching
+                const chunks = result.chunks || {};
+                botDiv.dataset.chunks = JSON.stringify(chunks);
+                const baseAnswer = result.answer || '';
+                botDiv.dataset.html = result.html || '';
+                botDiv.dataset.markdown = result.markdown_formatted || baseAnswer;
+                botDiv.dataset.raw = result.raw || baseAnswer;
+                botDiv.dataset.rawCitations = result.raw_citations || '';
+                botDiv.dataset.phpbb = result.phpbb || baseAnswer;
+                botDiv.dataset.currentMode = result.output_mode || 'html';
+                
+                // Create message wrapper
+                const messageWrapper = document.createElement('div');
+                messageWrapper.style.display = 'flex';
+                messageWrapper.style.flexDirection = 'column';
+                messageWrapper.style.width = '100%';
+                
+                // Create header with format selector
+                const messageHeader = document.createElement('div');
+                messageHeader.className = 'bot-message-header';
+                const formatSelector = document.createElement('select');
+                formatSelector.className = 'bot-message-format-selector';
+                formatSelector.innerHTML = `
+                    <option value="html">HTML</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="raw">Raw</option>
+                    <option value="phpbb">PHPBB</option>
+                `;
+                formatSelector.value = result.output_mode || 'html';
+                formatSelector.onchange = () => switchMessageFormat(botDiv, formatSelector.value);
+                messageHeader.appendChild(formatSelector);
+                messageWrapper.appendChild(messageHeader);
+                
+                // Create content container
+                const messageContent = document.createElement('div');
+                messageContent.className = 'bot-message-content';
+                messageWrapper.appendChild(messageContent);
+                
+                // Display initial format
+                displayMessageFormat(botDiv, messageContent, result.output_mode || 'html', chunks);
+                
+                // Clear botDiv and add content
+                botDiv.innerHTML = '';
+                botDiv.appendChild(messageWrapper);
+                
+            } catch (err) {
+                botDiv.innerText = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+
+        // Initialize
+        document.getElementById('send-btn').onclick = sendMessage;
+        document.getElementById('chat-input').onkeypress = (e) => {
+            if (e.key === 'Enter') sendMessage();
+        };
+        document.getElementById('view-history-btn').onclick = () => {
+            window.location.href = '/history';
+        };
+        document.getElementById('show-all-citations-btn').onclick = () => {
+            if (currentChunks && Object.keys(currentChunks).length > 0) {
+                // Display all citations
+                displayAllCitations(currentChunks);
+            }
+        };
+    </script>
+</body>
+</html>
